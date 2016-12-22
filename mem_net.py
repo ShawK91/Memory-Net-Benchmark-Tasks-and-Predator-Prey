@@ -8,7 +8,7 @@ class Deap_param:
     def __init__(self, angle_res, is_memoried):
         self.num_input = (360 * 2 / angle_res)
         self.num_hnodes = 5
-        self.num_output = 5
+        self.num_output = 2
 
         self.elite_fraction = 0.05
         self.crossover_prob = 0.2
@@ -39,14 +39,14 @@ class Parameters:
             self.grid_col = 15
             self.total_steps = 25 # Total roaming steps without goal before termination
             self.num_predator = 5
-            self.num_prey = 10
-            self.predator_random = 1
+            self.num_prey= 6
+            self.predator_random = 0
             self.prey_random = 1
             self.total_generations = 10000
             self.angle_res = 45
 
             #DEAP stuff
-            self.is_memoried_predator = 0
+            self.is_memoried_predator = 1
             self.is_memoried_prey = 0
             self.use_deap = 1
             if self.use_deap:
@@ -248,28 +248,21 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     #MAIN LOOP
     for genome_ind in range(parameters.population_size): #For evaluation
         #SIMULATION AND TRACK REWARD
-        rewards, global_reward = run_simulation(parameters, gridworld, genome_ind) #Returns rewards for each member of the team
-
+        global_reward, predator_rewards, prey_rewards = run_simulation(parameters, gridworld, genome_ind) #Returns rewards for each member of the team
         avg_global += global_reward
 
         #ENCODE FITNESS BACK TO predator
         for id, predator in enumerate(gridworld.predator_list):
-            ig_reward = rewards[id]
-            predator.evo_net.fitness_evals[genome_ind].append(ig_reward) #Assign those rewards
+            predator.evo_net.fitness_evals[genome_ind].append(predator_rewards[id]) #Assign those rewards
         # ENCODE FITNESS BACK TO prey
         for id, prey in enumerate(gridworld.prey_list):
-            if parameters.prey_global:
-                prey.evo_net.fitness_evals[genome_ind].append(-global_reward) #Assign those rewards
-            else: #Local
-                if prey.is_caught: prey.evo_net.fitness_evals[genome_ind].append(0)
-                else: prey.evo_net.fitness_evals[genome_ind].append(1)
-
+                prey.evo_net.fitness_evals[genome_ind].append(prey_rewards[id]) #Assign those rewards
 
     #if generation % 25 == 0: gridworld.save_pop() #Save population periodically
 
     for predator in gridworld.predator_list:
         predator.evo_net.update_fitness()# Assign fitness to genomes #
-        #predator.evo_net.epoch() #Run Epoch update in the population
+        predator.evo_net.epoch() #Run Epoch update in the population
     for prey in gridworld.prey_list:
         prey.evo_net.update_fitness()# Assign fitness to genomes #
         prey.evo_net.epoch() #Run Epoch update in the population
@@ -306,8 +299,8 @@ def run_simulation(parameters, gridworld, genome_ind, is_test = False): #Run sim
 
         gridworld.move() #Move gridworld
 
-        # mod.dispGrid(gridworld)
-        # raw_input('E')
+        #mod.dispGrid(gridworld)
+        #raw_input('E')
         gridworld.update_prey_observations() #Figure out the prey observations and store all credit information
 
 
@@ -329,12 +322,12 @@ def run_simulation(parameters, gridworld, genome_ind, is_test = False): #Run sim
             ig_traj_log.append(prey.position[1])
         trajectory_log.append(np.array(ig_traj_log))
 
-    rewards, global_reward = gridworld.get_reward()
+    global_reward, predator_rewards, prey_rewards = gridworld.get_reward()
 
     if is_test:
         #trajectory_log = np.array(trajectory_log)
         return rewards, global_reward, trajectory_log
-    return rewards, global_reward
+    return global_reward, predator_rewards, prey_rewards
 
 if __name__ == "__main__":
 
@@ -347,11 +340,9 @@ if __name__ == "__main__":
         tracker.add_fitness(avg_global, gen) #Add best global performance to tracker
         elapsed = time.time() - curtime
 
-        if parameters.use_neat and not parameters.use_py_neat :
-            print 'Gen:', gen, ' D' if parameters.D_reward else ' G',  ' Best g_reward', int(avg_global * 100), ' Avg:', int(100 * tracker.avg_fitness), '  BEST HOF SCORE: ', best_hof_score,  '  Fuel:', 'ON' if parameters.is_fuel else 'Off' , '  Time_offset type:', 'Hard' if parameters.is_hard_time_offset else 'Soft', 'Time_offset: ', parameters.time_offset #, 'Delta MPC:', int(tracker.avg_mpc), '+-', int(tracker.mpc_std), 'Elapsed Time: ', elapsed #' Delta generations Survival: '      #for i in range(num_predators): print all_pop[i].delta_age / params.PopulationSize,
 
-        else:
-            print 'Gen:', gen, 'Memoried' if parameters.is_memoried_predator or parameters.is_memoried_prey  else 'Normal', ' Best global', int(avg_global * 100), ' Avg:', int(100 * tracker.avg_fitness)#, 'Best hof_score: ', best_hof_score
+        print 'Gen:', gen, 'Memoried' if parameters.is_memoried_predator or parameters.is_memoried_prey  else \
+            'Normal', ' Avg global', int(avg_global ), ' Avg:', int(tracker.avg_fitness)
 
 
 

@@ -677,7 +677,7 @@ class Evo_net():
     def run_evo_net(self, state):
         if self.parameters.use_deap:
             output = self.net.feedforward(state)
-            return np.argmax(output)
+            return output
 
 
 
@@ -780,85 +780,42 @@ class Prey:
         self.fuel = 0
         self.is_caught = False
         self.observation_log = []
+        self.min_approach_log = np.zeros(self.parameters.num_predator) + self.parameters.grid_row + self.parameters.grid_col
 
     def init_prey(self, grid, is_new_epoch=True):
         if not is_new_epoch: #If not a new epoch and intra epoch (random already initialized)
             x = self.spawn_position[0]; y = self.spawn_position[1]
-            grid.state[x][y] = 2
             return [x,y]
 
-        if self.parameters.aamas_domain == 1:  # AAMAS test domain
-            if self.team_role_index == 0:
-                x = 9; y = 9
-            elif self.team_role_index == 1:
-                x = 9; y = 10
-            elif self.team_role_index == 2:
-                x = 10; y = 9
-            elif self.team_role_index == 3:
-                x = 10; y = 10
+        rad_row = 0.5 * grid.dim_row / (math.sqrt(3)); rad_col = 0.5 * grid.dim_col / (math.sqrt(3))
+        center_row = grid.dim_row / 2; center_col = grid.dim_col / 2
 
-            grid.state[x][y] = 2
-            return [x, y]
-
-
-
-        if self.parameters.domain_setup != 0:  # Known domain testing
-            if self.parameters.domain_setup == 1:
-                x = 4; y = 4
-
-
-            elif self.parameters.domain_setup == 2:
-                if self.team_role_index == 0:
-                    x = 14; y = 7
-                elif self.team_role_index == 1:
-                    x = 14; y = 8
-
-            elif self.parameters.domain_setup == 3:
-                if self.team_role_index == 0:
-                    x = 5; y = 5
-
-
-            grid.state[x][y] = 2
-            return [x, y]
-
-
-
-
-        start = grid.observe; end = grid.state.shape[0] - grid.observe - 1
-        rad = int(grid.dim_row / math.sqrt(3) / 2)
-        center = int((start + end) / 2)
         if grid.prey_rand:
-            while True:
-                rand = random.random()
-                if rand < 0.25:
-                    x = randint(start, center - rad - 1)
-                    y = randint(start, end)
-                elif rand < 0.5:
-                    x = randint(center + rad + 1, end)
-                    y = randint(start, end)
-                elif rand < 0.75:
-                    x = randint(center - rad, center + rad)
-                    y = randint(start, center - rad - 1)
-                else:
-                    x = randint(center - rad, center + rad)
-                    y = randint(center + rad + 1, end)
-                if grid.state[x][y] != 2: #Position not already occupied
-                    break
+            rand = random.random()
+            if rand < 0.25:
+                x = random.random() * (center_row - rad_row)
+                y = random.random() * (grid.dim_col)
+            elif rand < 0.5:
+                x = center_row + rad_row + random.random() * (center_row - rad_row)
+                y = random.random() * (grid.dim_col)
+            elif rand < 0.75:
+                x = random.random() * (grid.dim_row)
+                y = random.random() * (center_col - rad_col)
+            else:
+                x = random.random() * (grid.dim_row)
+                y = center_col + rad_col + random.random() * (center_col - rad_col)
+
         else:  # Not random
-            trial = 0
-            while True:
-                while True:
-                    x = center - rad + (trial % (rad*2))
-                    if x <= center + rad: break #If within limits
-                while True:
-                    y = center - rad + (trial / (rad*2))
-                    if y <= center + rad: break #If within limits
+            quadrant =self.team_role_index % 4
+            if quadrant == 0:
+                x = 0.0 + self.team_role_index / 4; y = 0.0 + self.team_role_index / (4 * (grid.dim_col-1))
+            if quadrant == 1:
+                x = grid.dim_col - 1.0 - self.team_role_index / (4 * (grid.dim_row - 1)); y = 0.0 + self.team_role_index / 4
+            if quadrant == 2:
+                x = grid.dim_col - 1.0  - self.team_role_index / 4; y = grid.dim_row - 1.0 - self.team_role_index / (4 * grid.dim_col)
+            if quadrant == 3:
+                x = 0.0 + self.team_role_index / (4 * (grid.dim_row - 1)); y = grid.dim_row - 1.0 - self.team_role_index / 4
 
-                if grid.state[x][y] != 1 and grid.state[x][y] != 4: #position not already occupied
-                    break
-                trial+=1
-
-        grid.state[x][y] = 2  # predator Code
         return [x, y]
 
     def reset(self, grid, is_new_epoch=False):
@@ -867,6 +824,7 @@ class Prey:
         self.fuel = 0
         self.is_caught = False
         self.observation_log = []
+        self.min_approach_log = np.zeros(self.parameters.num_predator) + self.parameters.grid_row + self.parameters.grid_col
 
     def take_action_test(self):
         #Modify state input to required input format
@@ -942,74 +900,35 @@ class Predator:
         self.fuel = 0
 
 
-
     def init_predator(self, grid, is_new_epoch=True):
         if not is_new_epoch: #If not a new epoch and intra epoch (random already initialized)
             x = self.spawn_position[0]; y = self.spawn_position[1]
-            grid.state[x][y] = 1
             return [x,y]
 
-        if self.parameters.aamas_domain == 1:  # AAMAS test domain
-            if self.team_role_index == 0:
-                x = 9; y = 9
-            elif self.team_role_index == 1:
-                x = 9; y = 10
-            elif self.team_role_index == 2:
-                x = 10; y = 9
-            elif self.team_role_index == 3:
-                x = 10; y = 10
+        rad_row = 0.5 * grid.dim_row / (math.sqrt(3));
+        rad_col = 0.5 * grid.dim_col / (math.sqrt(3))
+        center_row = grid.dim_row / 2;
+        center_col = grid.dim_col / 2
 
-            grid.state[x][y] = 1
-            return [x, y]
-
-
-
-        if self.parameters.domain_setup != 0:  # Known domain testing
-            if self.parameters.domain_setup == 1:
-                x = 4; y = 4
-
-
-            elif self.parameters.domain_setup == 2:
-                if self.team_role_index == 0:
-                    x = 14; y = 7
-                elif self.team_role_index == 1:
-                    x = 14; y = 8
-
-            elif self.parameters.domain_setup == 3:
-                if self.team_role_index == 0:
-                    x = 5; y = 5
-
-
-            grid.state[x][y] = 1
-            return [x, y]
-
-
-
-
-        start = grid.observe;  end = grid.state.shape[0] - grid.observe - 1
-        rad = int(grid.dim_row / math.sqrt(3) / 3)
-        center = int((start + end) / 2)
         if grid.predator_rand:
-            while True:
-                x = randint(center - rad, center + rad)
-                y = randint(center - rad, center + rad)
-                if grid.state[x][y] != 1: #position not already occupied
-                    break
+            x = center_row - rad_row + random.random() * 2 * rad_row
+            y = center_col - rad_col + random.random() * 2 * rad_col
+
         else:  # Not random
-            trial = 0
-            while True:
-                while True:
-                    x = center - rad + (trial % (rad*2))
-                    if x <= center + rad: break #If within limits
-                while True:
-                    y = center - rad + (trial / (rad*2))
-                    if y <= center + rad: break #If within limits
+            quadrant = self.team_role_index % 4
+            if quadrant == 0:
+                x = center_row - 1 - (self.team_role_index / 4) % (center_row - rad_row);
+                y = center_col - (self.team_role_index / (4*center_col - rad_col)) % (center_col - rad_col)
+            if quadrant == 1:
+                x = center_row + (self.team_role_index / (4*center_row - rad_row)) % (center_row - rad_row)
+                y = center_col - 1 + (self.team_role_index / 4) % (center_col - rad_col);
+            if quadrant == 2:
+                x = center_row + 1 + (self.team_role_index / 4) % (center_row - rad_row);
+                y = center_col + (self.team_role_index / (4*center_col - rad_col)) % (center_col - rad_col)
+            if quadrant == 3:
+                x = center_row - (self.team_role_index / (4*center_row - rad_row)) % (center_row - rad_row)
+                y = center_col + 1 - (self.team_role_index / 4) % (center_col - rad_col);
 
-                if grid.state[x][y] != 1 and grid.state[x][y] != 4: #position not already occupied
-                    break
-                trial+=1
-
-        grid.state[x][y] = 1  # predator Code
         return [x, y]
 
     def reset(self, grid, is_new_epoch=False):
@@ -1222,39 +1141,24 @@ class POI:
 class Gridworld:
     def __init__(self, parameters):
         self.parameters = parameters
-        self.observe = 1; self.dim_row = parameters.grid_row; self.dim_col = parameters.grid_col; self.prey_rand = parameters.prey_random; self.predator_rand = parameters.predator_random
+        self.dim_row = parameters.grid_row; self.dim_col = parameters.grid_col; self.prey_rand = parameters.prey_random; self.predator_rand = parameters.predator_random
         self.num_predator = parameters.num_predator;  self.num_prey = parameters.num_prey; self.angle_res = parameters.angle_res #Angle resolution
         self.coupling = parameters.coupling #coupling requirement
         self.obs_dist = parameters.obs_dist #Observation radius requirements
 
         #Resettable stuff
-        self.state = np.zeros((self.dim_row + self.observe*2, self.dim_col + self.observe*2)) #EMPTY SPACE = 0, #prey = 2, #WALL = 3, predator_Scout = 1, predator_service_bot = 4
-        self.init_wall() #initialize wall
         self.epoch_best_team = None
 
         self.prey_list = []; self.predator_list = []
         for i in range(self.num_prey): self.prey_list.append(Prey(self, parameters, i))
         for i in range(self.num_predator): self.predator_list.append(Predator(self, parameters, i))
 
-    def init_wall(self):
-        for i in range(self.observe):
-            for x in range(self.state.shape[0]):
-                self.state[x][i] = 3
-                self.state[x][self.state.shape[1] - 1-i] = 3
-            for y in range(self.state.shape[1]):
-                self.state[i][y] = 3
-                self.state[self.state.shape[0] - 1-i][y] = 3
-
     def new_epoch_reset(self):
-        self.state = np.zeros((self.dim_row + self.observe*2, self.dim_col + self.observe*2)) #EMPTY SPACE = 0, predator = 1, #prey = 2, WALL = 3
-        self.init_wall()
         self.epoch_best_team = None
         for prey in self.prey_list: prey.reset(self, is_new_epoch=True)
         for predator in self.predator_list: predator.reset(self, is_new_epoch=True)
 
     def reset(self, genome_index):
-        self.state = np.zeros((self.dim_row + self.observe*2, self.dim_col + self.observe*2)) #EMPTY SPACE = 0, predator = 1, #prey = 2, WALL = 3
-        self.init_wall()
 
         for prey_id, prey in enumerate(self.prey_list):
             prey.reset(self)
@@ -1266,56 +1170,26 @@ class Gridworld:
     def move(self):
         for predator in self.predator_list: #Move and predator
             action = predator.action
-            #print action
-            next_pos = np.copy(predator.position)
-            if action == 1: next_pos[1] += 1  # Right
-            elif action == 2: next_pos[0] += 1  # Down
-            elif action == 3: next_pos[1] -= 1  # Left
-            elif action == 4: next_pos[0] -= 1  # Up
+            next_pos = np.copy(predator.position) #Backup
+            next_pos[0] += action[0]; next_pos[1] += action[1] #Compute new locations
 
-            # Computer reward and check illegal moves
-            x = next_pos[0]; y = next_pos[1]
-            #TODO Make this better (Wall out of bounds due to increased speed
-            if x < 0: x = 0;
-            if x > self.dim_row + 1: x = self.dim_row + 1
-            if y < 0: y = 0;
-            if y > self.dim_col + 1: y = self.dim_col + 1
-
-            if self.state[x][y] == 3: next_pos = np.copy(predator.position) #Reset if hit wall
-            if self.state[x][y] == 1 and action != 0: next_pos = np.copy(predator.position) #Reset if other Scout predator and action != 0
-
-            # Update gridworld and predator position
-            self.state[predator.position[0]][predator.position[1]] = 0 #Encode newly freed position in the state template
-            self.state[next_pos[0]][next_pos[1]] = 1 #Encode newly occupied position in the state template
+            # Implement bounds
+            if next_pos[0] >= self.dim_row or next_pos[0] < 0: next_pos[0] = predator.position[0]
+            if next_pos[1] >= self.dim_row or next_pos[1] < 0: next_pos[1] = predator.position[1]
             predator.position[0] = next_pos[0]; predator.position[1] = next_pos[1] #Update new positions for the predator object
 
         for prey in self.prey_list: #Move and predator
             action = prey.action
-            #print action
-            next_pos = np.copy(prey.position)
-            if action == 1: next_pos[1] += 1  # Right
-            elif action == 2: next_pos[0] += 1  # Down
-            elif action == 3: next_pos[1] -= 1  # Left
-            elif action == 4: next_pos[0] -= 1  # Up
+            next_pos = np.copy(prey.position) #Backup
+            next_pos[0] += action[0]; next_pos[1] += action[1] #Compute new locations
 
-            # Computer reward and check illegal moves
-            x = next_pos[0]; y = next_pos[1]
-            #TODO Make this better (Wall out of bounds due to increased speed
-            if x < 0: x = 0;
-            if x > self.dim_row + 1: x = self.dim_row + 1
-            if y < 0: y = 0;
-            if y > self.dim_col + 1: y = self.dim_col + 1
-
-            if self.state[x][y] == 3: next_pos = np.copy(prey.position) #Reset if hit wall
-            if self.state[x][y] == 2 and action != 0: next_pos = np.copy(prey.position) #Reset if other Scout predator and action != 0
-
-            # Update gridworld and predator position
-            self.state[prey.position[0]][prey.position[1]] = 0 #Encode newly freed position in the state template
-            self.state[next_pos[0]][next_pos[1]] = 2 #Encode newly occupied position in the state template
+            # Implement bounds
+            if next_pos[0] >= self.dim_row or next_pos[0] < 0: next_pos[0] = prey.position[0]
+            if next_pos[1] >= self.dim_row or next_pos[1] < 0: next_pos[1] = prey.position[1]
             prey.position[0] = next_pos[0]; prey.position[1] = next_pos[1] #Update new positions for the predator object
 
-
     def get_state(self, agent, state_representation = None):  # Returns a flattened array around the predator position
+        #TODO Visibility parameterize
         if state_representation == None: state_representation = self.parameters.state_representation #If no override use choice in parameters
         if state_representation == 1:  # Angle brackets
             state = np.zeros(((360 / self.angle_res), 2))
@@ -1324,7 +1198,7 @@ class Gridworld:
                 dist_predator_list = [[] for x in xrange(360 / self.angle_res)]
 
             for prey in self.prey_list:
-                if prey != agent and prey.is_caught == False and random.random() < 0.5:  # FOR ALL preysS MINUS MYSELF
+                if prey != agent and prey.is_caught == False and random.random() < 0.2:  # FOR ALL preysS MINUS MYSELF
                     x1 = prey.position[0] - agent.position[0];
                     x2 = -1
                     y1 = prey.position[1] - agent.position[1];
@@ -1335,7 +1209,7 @@ class Gridworld:
 
 
             for other_predator in self.predator_list:
-                if other_predator != agent and random.random() < 0.5:  # FOR ALL predatorS MINUS MYSELF
+                if other_predator != agent and random.random() < 0.2:  # FOR ALL predatorS MINUS MYSELF
                     x1 = other_predator.position[0] - agent.position[0];
                     x2 = -1
                     y1 = other_predator.position[1] - agent.position[1];
@@ -1388,18 +1262,31 @@ class Gridworld:
         dist = math.sqrt(dist)
         return angle, dist
 
+    def get_dist(self, pos_1, pos_2):
+        #Remmeber unlike the dist calculated in get_ang_dist function, this one computes directly from position not vectors
+        return math.sqrt((pos_1[0]-pos_2[0])* (pos_1[0]-pos_2[0]) + (pos_1[1]-pos_2[1])* (pos_1[1]-pos_2[1]))
+
+
     def update_prey_observations(self):
         # Check for credit assignment
         for prey in self.prey_list:
-            soft_stat = []
+            soft_stat = []; dist_soft_stat = []
             for predator_id, predator in enumerate(self.predator_list): #Find all predators within range
-                if abs(prey.position[0] - predator.position[0]) <= self.obs_dist and abs(prey.position[1] - predator.position[1]) <= self.obs_dist:  # and self.goal_complete[prey_id] == False:
+                dist = self.get_dist(predator.position, prey.position)
+                if dist <= self.obs_dist:
                     soft_stat.append(predator_id)
+                    dist_soft_stat.append(dist)
+
             if len(soft_stat) >= self.coupling:  # If coupling requirement is met
-                for ag_id in soft_stat: prey.observation_log.append(ag_id)
+                for soft_index, ag_id in enumerate(soft_stat):
+                    prey.observation_log.append(ag_id)
+                    if dist_soft_stat[soft_index] < prey.min_approach_log[ag_id]: #Update minimum approach distance
+                        prey.min_approach_log[ag_id] = dist_soft_stat[soft_index]
                 prey.is_caught = True
 
+
     def save_pop(self):
+        #TODO SAVE PREY_POP AS WELL
         if self.parameters.use_deap:
             self.predator_list[0].evo_net.save_population()
 
@@ -1410,58 +1297,33 @@ class Gridworld:
         return is_complete
 
     def get_reward(self):
-        global_reward = 0.0 - self.parameters.num_prey/2 #Global reward obtained
-        for prey in self.prey_list: global_reward += prey.is_caught
-        global_reward /= (0.5 * self.parameters.num_prey)
-        rewards = np.zeros(self.parameters.num_predator)
+        #Compute global reward
+        global_reward = 0.0 #Global reward obtained aligned with predator doing well
+        for prey in self.prey_list:
+            global_reward -= np.min(prey.min_approach_log)
+        global_reward /= self.parameters.num_prey
 
+        predator_rewards = np.zeros(self.parameters.num_predator) #Prey-predator reward
+        prey_rewards = np.zeros(self.parameters.num_prey)  # Prey-predator reward
+
+        # Compute D reward for predator and local reward for prey
         if self.parameters.D_reward: #Difference reward scheme
-            for prey in self.prey_list:
-                if prey.is_caught: #If prey observed
+            for prey_id, prey in enumerate(self.prey_list):
+                top_two_pred_ind = np.argsort(prey.min_approach_log)[:2]
+                diff_reward = prey.min_approach_log[top_two_pred_ind[0]] - prey.min_approach_log[top_two_pred_ind[1]]
+                predator_rewards[top_two_pred_ind[0]] += diff_reward
 
-                    # Check if over-observed (Scout)
-                    no_reward = False
-                    all_predators = [a for a in prey.observation_log]
-                    unique_predators = set(all_predators)
-                    if len(unique_predators) > self.parameters.coupling:  # Only if it's observed by exactly the numbers needed
-                        no_reward = True;
-
-                    # Disburse rewards
-                    if not no_reward:
-                        for predator_id in unique_predators:
-                            rewards[predator_id] += 1.0 / self.parameters.num_prey  # Reward the first group of predators to get there
+                prey_rewards[prey_id] -= prey.min_approach_log[top_two_pred_ind[0]] #Local reward scheme for prey
 
         else: #G reward
-            rewards = np.zeros(self.parameters.num_predators)
-            rewards += global_reward  # Global reward scheme
-        return rewards, global_reward
+            predator_rewards += global_reward  # Global reward scheme
+            prey_rewards -= global_reward
 
-    def prey_move(self):
-        for prey in self.prey_list:
-            if random.random() < self.parameters.prey_motion_probability:
-                action = prey.take_action()
-                next_pos = np.copy(prey.position)
-                if action == 1:
-                    next_pos[1] += 1  # Right
-                elif action == 2:
-                    next_pos[0] += 1  # Down
-                elif action == 3:
-                    next_pos[1] -= 1  # Left
-                elif action == 4:
-                    next_pos[0] -= 1  # Up
 
-                # Computer reward and check illegal moves
-                x = next_pos[0];
-                y = next_pos[1]
-                if self.state[x][y] == 3: next_pos = np.copy(prey.position)  # Reset if hit wall
-
-                # Update gridworld and predator position
-                self.state[prey.position[0]][prey.position[1]] = 0  # Encode newly freed position in the state template
-                self.state[next_pos[0]][next_pos[1]] = 2  # Encode newly occupied position in the state template
-                prey.position[0] = next_pos[0];
-                prey.position[1] = next_pos[1]  # Update new positions for the predator object
+        return global_reward, predator_rewards, prey_rewards
 
     def save_best_team(self, generation):
+        #TODO OVERHAUL
         if not os.path.exists('Best_team'):
             os.makedirs('Best_team')
         for i, member_id in enumerate(self.epoch_best_team):
@@ -1474,6 +1336,7 @@ class Gridworld:
         np.savetxt('Best_team/save_gen', saved_gen)
 
     def load_test_policies(self):
+        #TODO OVERHAUL
         for i, predator in enumerate(self.predator_list_scout):
             is_success = predator.evo_net.test_net.Load('Best_team/' + 'Scout_' + str(i))
             if is_success != True:
@@ -1757,42 +1620,22 @@ def vizualize_trajectory(filename = 'trajectory.csv'):
     # v.create_path([[10.,10.],[10.,30.],[40.,40.]],'red','circle')
     v.run()
 
-def dispGrid(gridworld, state = None, full=True, predator_id = None):
+def dispGrid(gridworld):
+
+    grid = [["-" for i in range(gridworld.dim_row)] for i in range(gridworld.dim_col)] #Init grid
+
+    for predator in gridworld.predator_list:
+        #print predator.position
+        x = int(predator.position[0]); y = int(predator.position[1])
+        #print x,y
+        grid[x][y] = '*'
+    for prey in gridworld.prey_list:
+        #print prey.position
+        x = int(prey.position[0]); y = int(prey.position[1])
+        #print x,y
+        grid[x][y] = '$'
 
 
-    if state == None: #Given predatorq
-        if full:
-            st = np.copy(gridworld.state)
-        else:
-            x_beg = gridworld.predator_pos[predator_id][0] - gridworld.observe
-            y_beg = gridworld.predator_pos[predator_id][1] - gridworld.observe
-            x_end = gridworld.predator_pos[predator_id][0] + gridworld.observe + 1
-            y_end = gridworld.predator_pos[predator_id][1] + gridworld.observe + 1
-            st = np.copy(gridworld.state)
-            st = st[x_beg:x_end,:]
-            st = st[:,y_beg:y_end]
-    else:
-        st = []
-        print len(state)
-        row_leng = int(math.sqrt(len(state)))
-        for i in range(row_leng):
-            ig = []
-            for j in range(row_leng):
-                ig.append(state[i*row_leng + j])
-            st.append(ig)
-
-    grid = [["-" for i in range(len(st))] for i in range(len(st))]
-    grid[0][0] = "o"
-    for i in range(len(st)):
-        for j in range(len(st)):
-            if st[i][j] == 2:
-                grid[i][j] = '$'
-            if st[i][j] == 1:
-                grid[i][j] = '*'
-            if st[i][j] == 3:
-                grid[i][j] = '#'
-            if st[i][j] == 4:
-                grid[i][j] = '@'
     for row in grid:
         for e in row:
             print e,
