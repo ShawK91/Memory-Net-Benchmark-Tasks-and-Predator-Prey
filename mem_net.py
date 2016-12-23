@@ -37,16 +37,17 @@ class Parameters:
             self.population_size = 100
             self.grid_row = 15
             self.grid_col = 15
-            self.total_steps = 25 # Total roaming steps without goal before termination
+            self.total_steps = 20 # Total roaming steps without goal before termination
             self.num_predator = 5
             self.num_prey= 6
             self.predator_random = 0
             self.prey_random = 1
             self.total_generations = 10000
             self.angle_res = 45
+            self.observing_prob = 0.33
 
             #DEAP stuff
-            self.is_memoried_predator = 1
+            self.is_memoried_predator = 0
             self.is_memoried_prey = 0
             self.use_deap = 1
             if self.use_deap:
@@ -66,7 +67,7 @@ class Parameters:
                 self.domain_setup = 0
                 self.aamas_domain = 0
                 self.use_neat = 0  # Use NEAT VS. Keras based Evolution module
-                self.obs_dist = 1  # Observe distance (Radius of prey that predators have to be in for successful observation)
+                self.obs_dist = 3  # Observe distance (Radius of prey that predators have to be in for successful observation)
                 self.coupling = 1  # Number of predators required to simultaneously observe a prey
                 self.use_py_neat = 0  # Use Python implementation of NEAT
                 self.sensor_avg = True  # Average distance as state input vs (min distance by default)
@@ -238,7 +239,7 @@ def best_performance_trajectory(parameters, gridworld, teams, save_name='best_pe
 
 num_evals = 5
 def evolve(gridworld, parameters, generation, best_hof_score):
-    avg_global = 0.0
+    epoch_metrics = []
     gridworld.new_epoch_reset() #Reset initial random positions for the epoch
 
     # Get new genome list and fitness evaluations trackers
@@ -249,7 +250,7 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     for genome_ind in range(parameters.population_size): #For evaluation
         #SIMULATION AND TRACK REWARD
         global_reward, predator_rewards, prey_rewards = run_simulation(parameters, gridworld, genome_ind) #Returns rewards for each member of the team
-        avg_global += global_reward
+        epoch_metrics.append(global_reward)
 
         #ENCODE FITNESS BACK TO predator
         for id, predator in enumerate(gridworld.predator_list):
@@ -267,8 +268,10 @@ def evolve(gridworld, parameters, generation, best_hof_score):
         prey.evo_net.update_fitness()# Assign fitness to genomes #
         prey.evo_net.epoch() #Run Epoch update in the population
 
-
-    return avg_global/parameters.population_size
+    epoch_metrics = np.array(epoch_metrics)
+    avg_epoch = np.mean(epoch_metrics)
+    sd_epoch = np.std(epoch_metrics)
+    return avg_epoch, sd_epoch
 
 def run_simulation(parameters, gridworld, genome_ind, is_test = False): #Run simulation given a team and return fitness for each individuals in that team
 
@@ -335,14 +338,14 @@ if __name__ == "__main__":
     best_hof_score = 0
 
     for gen in range (parameters.total_generations): #Main Loop
-        curtime = time.time()
-        avg_global = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
-        tracker.add_fitness(avg_global, gen) #Add best global performance to tracker
-        elapsed = time.time() - curtime
+        #curtime = time.time()
+        avg_epoch, sd_epoch = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
+        tracker.add_fitness(avg_epoch, gen) #Add best global performance to tracker
+        #elapsed = time.time() - curtime
 
 
-        print 'Gen:', gen, 'Memoried' if parameters.is_memoried_predator or parameters.is_memoried_prey  else \
-            'Normal', ' Avg global', int(avg_global ), ' Avg:', int(tracker.avg_fitness)
+        print 'Gen:', gen, '  Predator:','Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Prey:', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
+            , 'Avg epoch:',int(avg_epoch), '  Sd_epoch:',int(sd_epoch),  '  Cumul_Avg:',int(tracker.avg_fitness)
 
 
 

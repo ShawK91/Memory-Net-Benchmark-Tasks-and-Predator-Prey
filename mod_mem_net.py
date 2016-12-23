@@ -1198,7 +1198,7 @@ class Gridworld:
                 dist_predator_list = [[] for x in xrange(360 / self.angle_res)]
 
             for prey in self.prey_list:
-                if prey != agent and prey.is_caught == False and random.random() < 0.2:  # FOR ALL preysS MINUS MYSELF
+                if prey != agent and prey.is_caught == False and random.random() < self.parameters.observing_prob:  # FOR ALL preysS MINUS MYSELF
                     x1 = prey.position[0] - agent.position[0];
                     x2 = -1
                     y1 = prey.position[1] - agent.position[1];
@@ -1209,7 +1209,7 @@ class Gridworld:
 
 
             for other_predator in self.predator_list:
-                if other_predator != agent and random.random() < 0.2:  # FOR ALL predatorS MINUS MYSELF
+                if other_predator != agent and random.random() < self.parameters.observing_prob:  # FOR ALL predatorS MINUS MYSELF
                     x1 = other_predator.position[0] - agent.position[0];
                     x2 = -1
                     y1 = other_predator.position[1] - agent.position[1];
@@ -1353,9 +1353,15 @@ class statistics(): #Tracker
         self.fitnesses = []; self.avg_fitness = 0; self.tr_avg_fit = []
         self.avg_mpc = 0; self.tr_avg_mpc = []; self.mpc_std = []; self.tr_mpc_std = []
         if parameters.is_memoried_predator:
-            self.file_save = 'Memory_net.csv'
+            if parameters.is_memoried_prey:
+                self.file_save = 'mem_mem.csv'
+            else:
+                self.file_save = 'mem_norm.csv'
         else:
-            self.file_save = 'Normal_net.csv'
+            if parameters.is_memoried_prey:
+                self.file_save = 'norm_mem.csv'
+            else:
+                self.file_save = 'norm_norm.csv'
 
     def add_fitness(self, fitness, generation):
         self.fitnesses.append(fitness)
