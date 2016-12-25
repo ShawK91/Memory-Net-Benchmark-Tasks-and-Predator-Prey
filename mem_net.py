@@ -7,7 +7,7 @@ from random import randint#, choice
 class Deap_param:
     def __init__(self, angle_res, is_memoried):
         self.num_input = (360 * 2 / angle_res)
-        self.num_hnodes = 5
+        self.num_hnodes = 10
         self.num_output = 2
 
         self.elite_fraction = 0.05
@@ -18,19 +18,19 @@ class Deap_param:
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
                 self.num_hnodes + 1) + self.num_output * (self.num_hnodes + 1) + self.num_hnodes
         else:
-            # Normalize network flexibility by changing hidden nodes
-            #naive_total_num_weights = self.num_hnodes*(self.num_input + 1) + self.num_output * (self.num_hnodes + 1)
-	        self.total_num_weights = self.num_hnodes * (self.num_input + 1) + self.num_output * (self.num_hnodes + 1)
+            #Normalize network flexibility by changing hidden nodes
+            naive_total_num_weights = self.num_hnodes*(self.num_input + 1) + self.num_output * (self.num_hnodes + 1)
+            #self.total_num_weights = self.num_hnodes * (self.num_input + 1) + self.num_output * (self.num_hnodes + 1)
             #continue
-        #     mem_weights = 3 * (
-        #         self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
-        #         self.num_hnodes + 1) + self.num_output * (self.num_hnodes + 1) + self.num_hnodes
-        #     normalization_factor = int(mem_weights/naive_total_num_weights)
-        #
-        #     #Set parameters for comparable flexibility with memoried net
-        #     self.num_hnodes *= normalization_factor + 1
-        #     self.total_num_weights = self.num_hnodes * (self.num_input + 1) + self.num_output * (self.num_hnodes + 1)
-        # print 'Num parameters: ', self.total_num_weights
+            mem_weights = 3 * (
+                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
+                 self.num_hnodes + 1) + self.num_output * (self.num_hnodes + 1) + self.num_hnodes
+            normalization_factor = int(mem_weights/naive_total_num_weights)
+
+            #Set parameters for comparable flexibility with memoried net
+            self.num_hnodes *= normalization_factor + 1
+            self.total_num_weights = self.num_hnodes * (self.num_input + 1) + self.num_output * (self.num_hnodes + 1)
+        print 'Num parameters: ', self.total_num_weights
 
 class Parameters:
     def __init__(self):
@@ -44,7 +44,7 @@ class Parameters:
             self.prey_random = 1
             self.total_generations = 10000
             self.angle_res = 45
-            self.observing_prob = 0.33
+            self.observing_prob = 0.5
 
             #DEAP stuff
             self.is_memoried_predator = 0
@@ -72,6 +72,7 @@ class Parameters:
                 self.use_py_neat = 0  # Use Python implementation of NEAT
                 self.sensor_avg = True  # Average distance as state input vs (min distance by default)
                 self.state_representation = 1  # 1 --> Angled brackets, 2--> List of predator/preys
+                self.num_evals_ccea = 5
 
 
                 #EV0-NET
@@ -237,8 +238,11 @@ def best_performance_trajectory(parameters, gridworld, teams, save_name='best_pe
     trajectory_log = np.array(trajectory_log)
     np.savetxt(save_name, trajectory_log, delimiter=',', fmt='%10.5f')
 
-num_evals = 5
+
+
+
 def evolve(gridworld, parameters, generation, best_hof_score):
+    best_team = None
     epoch_metrics = []
     gridworld.new_epoch_reset() #Reset initial random positions for the epoch
 
@@ -246,18 +250,34 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     for i in range(parameters.num_predator): gridworld.predator_list[i].evo_net.referesh_genome_list()
     for i in range(parameters.num_prey): gridworld.prey_list[i].evo_net.referesh_genome_list()
 
+    #Get selection pools
+    selection_pool = mod.team_selection(gridworld, parameters)
+    teams = np.zeros(parameters.num_predator + parameters.num_prey).astype(int)  # Team definitions by index
+
+
     #MAIN LOOP
-    for genome_ind in range(parameters.population_size): #For evaluation
+    for genome_ind in range(parameters.population_size * parameters.num_evals_ccea): #For evaluation
+
+        #PICK TEAMS
+        for i in range(len(teams)):
+            debug_choice_bound = (len(selection_pool[i])-1) #Hack to choose 0 when no other choices exist
+            if debug_choice_bound == 0:
+                rand_index = 0
+            else:
+                rand_index = randint(0, debug_choice_bound) #Get a random index
+            teams[i] = selection_pool[i][rand_index] #Pick team member from that index
+            selection_pool[i] = np.delete(selection_pool[i], rand_index) #Delete that index from the selection pool
+
         #SIMULATION AND TRACK REWARD
-        global_reward, predator_rewards, prey_rewards = run_simulation(parameters, gridworld, genome_ind) #Returns rewards for each member of the team
+        global_reward, predator_rewards, prey_rewards = run_simulation(parameters, gridworld, teams) #Returns rewards for each member of the team
         epoch_metrics.append(global_reward)
 
         #ENCODE FITNESS BACK TO predator
         for id, predator in enumerate(gridworld.predator_list):
-            predator.evo_net.fitness_evals[genome_ind].append(predator_rewards[id]) #Assign those rewards
+            predator.evo_net.fitness_evals[teams[id]].append(predator_rewards[id]) #Assign those rewards
         # ENCODE FITNESS BACK TO prey
         for id, prey in enumerate(gridworld.prey_list):
-                prey.evo_net.fitness_evals[genome_ind].append(prey_rewards[id]) #Assign those rewards
+                prey.evo_net.fitness_evals[teams[parameters.num_predator + id]].append(prey_rewards[id]) #Assign those rewards
 
     #if generation % 25 == 0: gridworld.save_pop() #Save population periodically
 
@@ -273,10 +293,10 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     sd_epoch = np.std(epoch_metrics)
     return avg_epoch, sd_epoch
 
-def run_simulation(parameters, gridworld, genome_ind, is_test = False): #Run simulation given a team and return fitness for each individuals in that team
+def run_simulation(parameters, gridworld, teams, is_test = False): #Run simulation given a team and return fitness for each individuals in that team
 
     #if is_test: trajectory_log = []
-    gridworld.reset(genome_ind)  # Reset board and build net
+    gridworld.reset(teams)  # Reset board and build net
     #mod.dispGrid(gridworld)
 
     for steps in range(parameters.total_steps):  # One training episode till goal is not reached

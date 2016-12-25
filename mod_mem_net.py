@@ -1158,14 +1158,15 @@ class Gridworld:
         for prey in self.prey_list: prey.reset(self, is_new_epoch=True)
         for predator in self.predator_list: predator.reset(self, is_new_epoch=True)
 
-    def reset(self, genome_index):
+    def reset(self, teams):
 
-        for prey_id, prey in enumerate(self.prey_list):
-            prey.reset(self)
-            prey.evo_net.build_net(genome_index)
         for predator_id, predator in enumerate(self.predator_list):
             predator.reset(self)
-            predator.evo_net.build_net(genome_index)
+            predator.evo_net.build_net(teams[predator_id])
+        for prey_id, prey in enumerate(self.prey_list):
+            prey.reset(self)
+            prey.evo_net.build_net(teams[self.parameters.num_predator + prey_id])
+
 
     def move(self):
         for predator in self.predator_list: #Move and predator
@@ -1310,10 +1311,10 @@ class Gridworld:
         if self.parameters.D_reward: #Difference reward scheme
             for prey_id, prey in enumerate(self.prey_list):
                 top_two_pred_ind = np.argsort(prey.min_approach_log)[:2]
-                diff_reward = prey.min_approach_log[top_two_pred_ind[0]] - prey.min_approach_log[top_two_pred_ind[1]]
+                diff_reward = prey.min_approach_log[top_two_pred_ind[1]] - prey.min_approach_log[top_two_pred_ind[0]]
                 predator_rewards[top_two_pred_ind[0]] += diff_reward
 
-                prey_rewards[prey_id] -= prey.min_approach_log[top_two_pred_ind[0]] #Local reward scheme for prey
+                prey_rewards[prey_id] += prey.min_approach_log[top_two_pred_ind[0]] #Local reward scheme for prey
 
         else: #G reward
             predator_rewards += global_reward  # Global reward scheme
@@ -1656,9 +1657,43 @@ def roulette_wheel(scores):
         if rand < counter:
             return i
 
+def team_selection(gridworld, parameters):
+    # MAKE SELECTION POOLS
+    selection_pool = [];
+    max_pool_size = 0  # Selection pool listing the individuals with multiples for to match number of evaluations
+    for i in range(parameters.num_predator):  # Filling the selection pool
+        if parameters.use_neat:
+            ig_num_individuals = len(
+                gridworld.predator_list[i].evo_net.genome_list)  # NEAT's number of individuals can change
+        else:
+            ig_num_individuals = parameters.population_size  # For keras_evo-net the number of individuals stays constant at population size
+        selection_pool.append(np.arange(ig_num_individuals))
+        for j in range(parameters.num_evals_ccea - 1): selection_pool[i] = np.append(selection_pool[i],
+                                                                     np.arange(ig_num_individuals))
+        if len(selection_pool[i]) > max_pool_size: max_pool_size = len(selection_pool[i])
+    for i in range(parameters.num_prey):  # Filling the selection pool
+        if parameters.use_neat:
+            ig_num_individuals = len(
+                gridworld.prey_list[i].evo_net.genome_list)  # NEAT's number of individuals can change
+        else:
+            ig_num_individuals = parameters.population_size  # For keras_evo-net the number of individuals stays constant at population size
+        selection_pool.append(np.arange(ig_num_individuals))
+        for j in range(parameters.num_evals_ccea - 1): selection_pool[i + parameters.num_predator] = np.append(
+            selection_pool[i + parameters.num_predator], np.arange(ig_num_individuals))
+        if len(selection_pool[i + parameters.num_predator]) > max_pool_size: max_pool_size = len(
+            selection_pool[i + parameters.num_predator])
 
+    if parameters.use_neat:
+        for i, pool in enumerate(selection_pool):  # Equalize the selection pool
+            diff = max_pool_size - len(pool)
+            if diff != 0:
+                ig_cap = len(pool) / parameters.num_evals_ccea
+                while diff > ig_cap:
+                    selection_pool[i] = np.append(selection_pool[i], np.arange(ig_cap))
+                    diff -= ig_cap
+                selection_pool[i] = np.append(selection_pool[i], np.arange(diff))
 
-
+    return selection_pool
 #BACKUPS
 
 def init_nn(input_size, hidden_nodes, middle_layer = False, weights = 0):
