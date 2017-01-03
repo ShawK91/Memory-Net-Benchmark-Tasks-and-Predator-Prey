@@ -10,7 +10,7 @@ class Deap_param:
         self.num_hnodes = 10
         self.num_output = 2
 
-        self.elite_fraction = 0.05
+        self.elite_fraction = 0.1
         self.crossover_prob = 0.2
         self.mutation_prob = 0.9
         if is_memoried:
@@ -38,8 +38,8 @@ class Parameters:
             self.grid_row = 15
             self.grid_col = 15
             self.total_steps = 20 # Total roaming steps without goal before termination
-            self.num_predator = 5
-            self.num_prey= 6
+            self.num_predator = 2
+            self.num_prey= 2
             self.predator_random = 0
             self.prey_random = 1
             self.total_generations = 10000
@@ -59,7 +59,7 @@ class Parameters:
             if True:
                 # GIVEN
 
-                self.D_reward = 1  # D reward scheme
+                self.D_reward = 0  # D reward scheme
                 self.prey_global = 0 #Prey's reward scheme
                 self.wheel_action = 0
 
@@ -67,12 +67,12 @@ class Parameters:
                 self.domain_setup = 0
                 self.aamas_domain = 0
                 self.use_neat = 0  # Use NEAT VS. Keras based Evolution module
-                self.obs_dist = 3  # Observe distance (Radius of prey that predators have to be in for successful observation)
+                self.obs_dist = 2  # Observe distance (Radius of prey that predators have to be in for successful observation)
                 self.coupling = 1  # Number of predators required to simultaneously observe a prey
                 self.use_py_neat = 0  # Use Python implementation of NEAT
                 self.sensor_avg = True  # Average distance as state input vs (min distance by default)
                 self.state_representation = 1  # 1 --> Angled brackets, 2--> List of predator/preys
-                self.num_evals_ccea = 5
+                self.num_evals_ccea = 3
 
 
                 #EV0-NET
@@ -238,9 +238,6 @@ def best_performance_trajectory(parameters, gridworld, teams, save_name='best_pe
     trajectory_log = np.array(trajectory_log)
     np.savetxt(save_name, trajectory_log, delimiter=',', fmt='%10.5f')
 
-
-
-
 def evolve(gridworld, parameters, generation, best_hof_score):
     best_team = None
     epoch_metrics = []
@@ -269,7 +266,7 @@ def evolve(gridworld, parameters, generation, best_hof_score):
             selection_pool[i] = np.delete(selection_pool[i], rand_index) #Delete that index from the selection pool
 
         #SIMULATION AND TRACK REWARD
-        global_reward, predator_rewards, prey_rewards = run_simulation(parameters, gridworld, teams) #Returns rewards for each member of the team
+        global_reward, predator_rewards, prey_rewards = run_simulation(parameters, gridworld, teams, is_hof = False) #Returns rewards for each member of the team
         epoch_metrics.append(global_reward)
 
         #ENCODE FITNESS BACK TO predator
@@ -282,21 +279,26 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     #if generation % 25 == 0: gridworld.save_pop() #Save population periodically
 
     for predator in gridworld.predator_list:
-        predator.evo_net.update_fitness()# Assign fitness to genomes #
+        predator.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
         predator.evo_net.epoch() #Run Epoch update in the population
     for prey in gridworld.prey_list:
-        prey.evo_net.update_fitness()# Assign fitness to genomes #
+        prey.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
         prey.evo_net.epoch() #Run Epoch update in the population
+
+    #HOF VS simulation
+    hof_reward, hof_predator_rewards, hof_prey_rewards = run_simulation(parameters, gridworld, teams=None, is_hof = True)
+
+
 
     epoch_metrics = np.array(epoch_metrics)
     avg_epoch = np.mean(epoch_metrics)
     sd_epoch = np.std(epoch_metrics)
-    return avg_epoch, sd_epoch
+    return avg_epoch, sd_epoch, hof_reward
 
-def run_simulation(parameters, gridworld, teams, is_test = False): #Run simulation given a team and return fitness for each individuals in that team
+def run_simulation(parameters, gridworld, teams, is_test = False, is_hof = False): #Run simulation given a team and return fitness for each individuals in that team
 
     #if is_test: trajectory_log = []
-    gridworld.reset(teams)  # Reset board and build net
+    if is_hof == False: gridworld.reset(teams)  # Reset board and build net
     #mod.dispGrid(gridworld)
 
     for steps in range(parameters.total_steps):  # One training episode till goal is not reached
@@ -309,7 +311,7 @@ def run_simulation(parameters, gridworld, teams, is_test = False): #Run simulati
                 ig_traj_log.append(predator.position[0])
                 ig_traj_log.append(predator.position[1])
             else:
-                predator.take_action() #Make the predator take action using the Evo-net with given id from the population
+                predator.take_action(is_hof) #Make the predator take action using the Evo-net with given id from the population
 
         for id, prey in enumerate(gridworld.prey_list):  #get all the action choices from the predators
             prey.perceived_state = gridworld.get_state(prey) #Update all predator's perceived state
@@ -318,16 +320,13 @@ def run_simulation(parameters, gridworld, teams, is_test = False): #Run simulati
                 ig_traj_log.append(prey.position[0])
                 ig_traj_log.append(prey.position[1])
             else:
-                prey.take_action() #Make the predator take action using the Evo-net with given id from the population
+                prey.take_action(is_hof) #Make the predator take action using the Evo-net with given id from the population
 
         gridworld.move() #Move gridworld
 
         #mod.dispGrid(gridworld)
         #raw_input('E')
         gridworld.update_prey_observations() #Figure out the prey observations and store all credit information
-
-
-
 
     #Log final position
     if is_test:
@@ -359,13 +358,14 @@ if __name__ == "__main__":
 
     for gen in range (parameters.total_generations): #Main Loop
         #curtime = time.time()
-        avg_epoch, sd_epoch = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
-        tracker.add_fitness(avg_epoch, gen) #Add best global performance to tracker
+        avg_epoch, sd_epoch, hof_reward = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
+        tracker.add_fitness(avg_epoch, gen) #Add average global performance to tracker
+        tracker.add_hof_fitness(hof_reward, gen)  # Add hof global performance to tracker
         #elapsed = time.time() - curtime
 
 
-        print 'Gen:', gen, '  Predator:','Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Prey:', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
-            , 'Avg epoch:',int(avg_epoch), '  Sd_epoch:',int(sd_epoch),  '  Cumul_Avg:',int(tracker.avg_fitness)
+        print 'Gen:', gen,'Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
+            , ' HOF Reward:', int(hof_reward),' Cumul_hof_avg:',int(tracker.hof_avg_fitness), '  Avg epoch:',int(avg_epoch), ' Sd_epoch:',int(sd_epoch),  '  Cumul_Avg:',int(tracker.avg_fitness)
 
 
 

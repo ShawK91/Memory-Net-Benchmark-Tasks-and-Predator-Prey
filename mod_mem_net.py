@@ -544,11 +544,12 @@ class Evo_net():
             self.fitness_evals = [[] for x in xrange(parameters.population_size)]
             if self.parameters.is_memoried_prey and self.type == 'prey' or self.parameters.is_memoried_predator and self.type == 'predator':
                 self.net = memory_net(deap_param.num_input, deap_param.num_hnodes, deap_param.num_output)
+                self.hof_net = memory_net(deap_param.num_input, deap_param.num_hnodes, deap_param.num_output)
             else:
                 self.net = normal_net(deap_param.num_input, deap_param.num_hnodes,
                                       deap_param.num_output)
-
-
+                self.hof_net = normal_net(deap_param.num_input, deap_param.num_hnodes,
+                           deap_param.num_output)
 
         elif parameters.use_neat:
             if parameters.use_py_neat: #Python implementation of NEAT
@@ -598,8 +599,6 @@ class Evo_net():
 
     def epoch(self): #Method to complete epoch after fitness has been assigned to the genomes
         if self.parameters.use_deap:
-            # for i, individual in enumerate(self.pop):
-            #     individual.fitness.values = self.fitness_evals[i]  # Assign fitness
 
             # Elitist reserve
             elitist_reserve = []
@@ -672,11 +671,11 @@ class Evo_net():
             # else:
             #     self.net_list[index] = self.pop.net_pop[int(self.pop.pop_handle[index][0])]
 
-
     # Get action choice from Evo-net
-    def run_evo_net(self, state):
+    def run_evo_net(self, state, is_hof):
         if self.parameters.use_deap:
-            output = self.net.feedforward(state)
+            if is_hof: output = self.hof_net.feedforward(state)
+            else: output = self.net.feedforward(state)
             return output
 
 
@@ -710,15 +709,20 @@ class Evo_net():
     def update_fitness(self): #Update the fitnesses of the genome and also encode the best one for the generation
 
         if self.parameters.use_deap:
-            best = 0;
+            best = -1000000000; best_index = None
             for i in range(self.parameters.population_size):
                 if len(self.fitness_evals[i]) != 0:  # if fitness evals is not empty (wasnt evaluated)
                     if self.parameters.leniency: avg_fitness = max(self.fitness_evals[i]) #Use lenient learner
                     else: avg_fitness = sum(self.fitness_evals[i])/len(self.fitness_evals[i])
+                    self.fitness_evals[i] = avg_fitness
                     if avg_fitness > best:
                         best = avg_fitness
+                        best_index = i
                     self.pop[i].fitness.values = avg_fitness,
 
+        #Update hof_net
+        if self.parameters.use_deap:
+            self.hof_net.set_weights(self.pop[best_index])
 
 
         elif self.parameters.use_neat:
@@ -867,10 +871,10 @@ class Prey:
 
         self.action = action
 
-    def take_action(self):
+    def take_action(self, is_hof):
         #Modify state input to required input format
         evo_input = np.reshape(self.perceived_state, (self.perceived_state.shape[1]))  # State input only (Strictly Darwinian approach)
-        self.action = self.evo_net.run_evo_net(evo_input) #Take action
+        self.action = self.evo_net.run_evo_net(evo_input, is_hof) #Take action
 
     def ready_for_simulation(self, net_id):
         if self.parameters.online_learning and self.parameters.baldwin:  # Update interim model belonging to the teams[i] indexed individual in the ith sub-population
@@ -898,7 +902,6 @@ class Predator:
         self.perceived_state = None #State of the gridworld as perceived by the predator
         self.split_learner_state = None #Useful for split learner
         self.fuel = 0
-
 
     def init_predator(self, grid, is_new_epoch=True):
         if not is_new_epoch: #If not a new epoch and intra epoch (random already initialized)
@@ -977,10 +980,10 @@ class Predator:
 
         self.action = action
 
-    def take_action(self):
+    def take_action(self, is_hof):
         #Modify state input to required input format
         evo_input = np.reshape(self.perceived_state, (self.perceived_state.shape[1]))  # State input only (Strictly Darwinian approach)
-        self.action = self.evo_net.run_evo_net(evo_input) #Take action
+        self.action = self.evo_net.run_evo_net(evo_input, is_hof) #Take action
 
     def ready_for_simulation(self, net_id):
         if self.parameters.online_learning and self.parameters.baldwin:  # Update interim model belonging to the teams[i] indexed individual in the ith sub-population
@@ -1167,7 +1170,6 @@ class Gridworld:
             prey.reset(self)
             prey.evo_net.build_net(teams[self.parameters.num_predator + prey_id])
 
-
     def move(self):
         for predator in self.predator_list: #Move and predator
             action = predator.action
@@ -1267,7 +1269,6 @@ class Gridworld:
         #Remmeber unlike the dist calculated in get_ang_dist function, this one computes directly from position not vectors
         return math.sqrt((pos_1[0]-pos_2[0])* (pos_1[0]-pos_2[0]) + (pos_1[1]-pos_2[1])* (pos_1[1]-pos_2[1]))
 
-
     def update_prey_observations(self):
         # Check for credit assignment
         for prey in self.prey_list:
@@ -1284,7 +1285,6 @@ class Gridworld:
                     if dist_soft_stat[soft_index] < prey.min_approach_log[ag_id]: #Update minimum approach distance
                         prey.min_approach_log[ag_id] = dist_soft_stat[soft_index]
                 prey.is_caught = True
-
 
     def save_pop(self):
         #TODO SAVE PREY_POP AS WELL
@@ -1352,7 +1352,7 @@ class Gridworld:
 class statistics(): #Tracker
     def __init__(self, parameters):
         self.fitnesses = []; self.avg_fitness = 0; self.tr_avg_fit = []
-        self.avg_mpc = 0; self.tr_avg_mpc = []; self.mpc_std = []; self.tr_mpc_std = []
+        self.hof_fitnesses = []; self.hof_avg_fitness = 0; self.hof_tr_avg_fit = []
         if parameters.is_memoried_predator:
             if parameters.is_memoried_prey:
                 self.file_save = 'mem_mem.csv'
@@ -1366,22 +1366,28 @@ class statistics(): #Tracker
 
     def add_fitness(self, fitness, generation):
         self.fitnesses.append(fitness)
-        if len(self.fitnesses) > 200:
+        if len(self.fitnesses) > 100:
             self.fitnesses.pop(0)
         self.avg_fitness = sum(self.fitnesses)/len(self.fitnesses)
         if generation % 10 == 0: #Save to csv file
-            self.save_csv(generation)
+            filename = 'avg_' + self.file_save
+            self.tr_avg_fit.append(np.array([generation, self.avg_fitness]))
+            np.savetxt(filename, np.array(self.tr_avg_fit), fmt='%.3f', delimiter=',')
 
-    def add_mpc(self, gridworld, parameters):
-        all_mpc = np.zeros(parameters.num_predators_scout + parameters.num_predators_service_bot)
-        for id, predator in enumerate(gridworld.predator_list): all_mpc[id] = predator.evo_net.delta_mpc
-        self.avg_mpc = np.average(all_mpc) #Average mpc
-        self.mpc_std = np.std(all_mpc)
+    def add_hof_fitness(self, hof_fitness, generation):
+        self.hof_fitnesses.append(hof_fitness)
+        if len(self.hof_fitnesses) > 100:
+            self.hof_fitnesses.pop(0)
+        self.hof_avg_fitness = sum(self.hof_fitnesses)/len(self.hof_fitnesses)
+        if generation % 10 == 0: #Save to csv file
+            filename = 'hof_' + self.file_save
+            self.hof_tr_avg_fit.append(np.array([generation, self.hof_avg_fitness]))
+            np.savetxt(filename, np.array(self.hof_tr_avg_fit), fmt='%.3f', delimiter=',')
 
 
-    def save_csv(self, generation):
+    def save_csv(self, generation, filename):
         self.tr_avg_fit.append(np.array([generation, self.avg_fitness]))
-        np.savetxt(self.file_save, np.array(self.tr_avg_fit), fmt='%.3f', delimiter=',')
+        np.savetxt(filename, np.array(self.tr_avg_fit), fmt='%.3f', delimiter=',')
 
 class keras_Population(): #Keras population
     def __init__(self, input_size, hidden_nodes, output, population_size, elite_fraction = 0.2):
@@ -2004,8 +2010,6 @@ def get_first_state(self, predator_id, use_rnn, sensor_avg,
     rnn_state = np.array(rnn_state)
     rnn_state = np.reshape(rnn_state, (1, rnn_state.shape[0], rnn_state.shape[2]))
     return rnn_state
-
-
 def referesh_state(self, current_state, predator_id, use_rnn):
     st = self.get_state(predator_id)
     if use_rnn:
