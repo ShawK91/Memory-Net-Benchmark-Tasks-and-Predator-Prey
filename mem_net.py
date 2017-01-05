@@ -9,6 +9,8 @@ class Deap_param:
         self.num_input = (360 * 2 / angle_res)
         self.num_hnodes = 10
         self.num_output = 2
+        if is_memoried: self.type_id = 'memoried'
+        else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
@@ -34,23 +36,25 @@ class Deap_param:
 
 class Parameters:
     def __init__(self):
-            self.population_size = 100
+            self.population_size = 10
             self.grid_row = 15
             self.grid_col = 15
             self.total_steps = 20 # Total roaming steps without goal before termination
-            self.num_predator = 2
-            self.num_prey= 2
+            self.num_predator = 1
+            self.num_prey= 1
             self.predator_random = 0
             self.prey_random = 1
             self.total_generations = 10000
             self.angle_res = 45
             self.observing_prob = 0.5
 
-            #DEAP stuff
-            self.is_memoried_predator = 0
+            self.is_memoried_predator = 1
             self.is_memoried_prey = 0
-            self.use_deap = 1
-            if self.use_deap:
+
+            #DEAP/SSNE stuff
+            self.use_ssne = 1
+            self.use_deap = 0
+            if self.use_deap or self.use_ssne:
                 self.deap_param_predator = Deap_param(self.angle_res, self.is_memoried_predator)
                 self.deap_param_prey = Deap_param(self.angle_res, self.is_memoried_prey)
 
@@ -78,7 +82,7 @@ class Parameters:
                 #EV0-NET
                 self.use_hall_of_fame = 0
                 self.hof_weight = 0.99
-                self.leniency = 1  # Fitness calculation based on leniency vs averaging
+                self.leniency = 0  # Fitness calculation based on leniency vs averaging
 
                 if self.use_neat: #Neat
                     if self.use_py_neat: #Python NEAT
@@ -239,8 +243,7 @@ def best_performance_trajectory(parameters, gridworld, teams, save_name='best_pe
     np.savetxt(save_name, trajectory_log, delimiter=',', fmt='%10.5f')
 
 def evolve(gridworld, parameters, generation, best_hof_score):
-    best_team = None
-    epoch_metrics = []
+    epoch_metrics = [];
     gridworld.new_epoch_reset() #Reset initial random positions for the epoch
 
     # Get new genome list and fitness evaluations trackers
@@ -250,7 +253,6 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     #Get selection pools
     selection_pool = mod.team_selection(gridworld, parameters)
     teams = np.zeros(parameters.num_predator + parameters.num_prey).astype(int)  # Team definitions by index
-
 
     #MAIN LOOP
     for genome_ind in range(parameters.population_size * parameters.num_evals_ccea): #For evaluation

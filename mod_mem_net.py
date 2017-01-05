@@ -51,8 +51,6 @@ class normal_net:
     def fast_sigmoid(self, layer_input): #Sigmoid transform
         for i in layer_input: i = i / (1 + math.fabs(i))
         return layer_input
-    #TODO TEST BENCHMARK
-
 
     def softmax(self, layer_input): #Softmax transform
         layer_input = np.exp(layer_input)
@@ -91,6 +89,7 @@ class normal_net:
 
 class memory_net:
     def __init__(self, num_input, num_hnodes, num_output, mean = 0, std = 1):
+        #TODO Weight initialization
         self.num_input = num_input; self.num_output = num_output; self.num_hnodes = num_hnodes; self.net_output = []
         self.last_output = np.mat(np.zeros(num_output)).transpose()
         self.memory_cell = np.mat(np.random.normal(mean, std, num_hnodes)).transpose() #Memory Cell
@@ -167,7 +166,6 @@ class memory_net:
     def format_memory(self, memory):
         ig = np.mat([1])
         return np.concatenate((memory, ig))
-
 
     def feedforward(self, input): #Feedforwards the input and computes the forward pass of the network
         self.input = self.format_input(input).transpose()  # Format and add bias term at the end
@@ -261,6 +259,411 @@ class memory_net:
         start = end; end += self.num_hnodes
         memory_cell= weights[start:end]
         self.memory_cell = np.mat(memory_cell).transpose()
+
+class SSNE:
+    def __init__(self, parameters, ssne_param):
+        self.current_gen = 0
+        self.parameters = parameters; self.ssne_param = ssne_param
+        self.num_weights = self.ssne_param.total_num_weights;
+        self.population_size = self.parameters.population_size;
+
+        self.num_elitists = int(self.ssne_param.elite_fraction * parameters.population_size)
+        if self.num_elitists < 1: self.num_elitists = 1
+
+        self.fitness_evals = [[] for x in xrange(parameters.population_size)]  # Fitness eval list
+        # Create population
+        self.pop = []
+        if self.ssne_param.type_id == 'memoried':
+            for i in range(self.population_size):
+                self.pop.append(
+                    memory_net(self.ssne_param.num_input, self.ssne_param.num_hnodes, self.ssne_param.num_output))
+            self.hof_net = memory_net(self.ssne_param.num_input, self.ssne_param.num_hnodes, self.ssne_param.num_output)
+        else:
+            for i in range(self.population_size):
+                self.pop.append(
+                    normal_net(self.ssne_param.num_input, self.ssne_param.num_hnodes, self.ssne_param.num_output))
+            self.hof_net = normal_net(self.ssne_param.num_input, self.ssne_param.num_hnodes, self.ssne_param.num_output)
+
+
+    def selection_tournament(self, index_rank, num_offsprings, tournament_size):
+        total_choices = len(index_rank)
+        offsprings = []
+        for i in range(num_offsprings):
+            winner = np.min(np.random.randint(total_choices, size=tournament_size))
+            offsprings.append(index_rank[winner])
+
+        offsprings = list(set(offsprings)) #Find unique offsprings
+        if len(offsprings) % 2 != 0: #Number of offsprings should be even
+            offsprings.append(offsprings[randint(0, len(offsprings)-1)])
+        return offsprings
+
+    def list_argsort(self, seq):
+        return sorted(range(len(seq)), key=seq.__getitem__)
+
+    def crossover_inplace(self, gene1, gene2):
+        if self.ssne_param.type_id == 'memoried': #Memory net
+            #INPUT GATES
+            #Layer 1
+            num_cross_overs = randint(1, len(gene1.w_inpgate))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_inpgate)-1)
+                    gene1.w_inpgate[ind_cr, :] = gene2.w_inpgate[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_inpgate)-1)
+                    gene2.w_inpgate[ind_cr, :] = gene1.w_inpgate[ind_cr, :]
+                else: continue
+
+            #Layer 2
+            num_cross_overs = randint(1, len(gene1.w_rec_inpgate))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_rec_inpgate)-1)
+                    gene1.w_rec_inpgate[ind_cr, :] = gene2.w_rec_inpgate[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_rec_inpgate)-1)
+                    gene2.w_rec_inpgate[ind_cr, :] = gene1.w_rec_inpgate[ind_cr, :]
+                else: continue
+
+            #Layer 3
+            num_cross_overs = randint(1, len(gene1.w_mem_inpgate))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_mem_inpgate)-1)
+                    gene1.w_mem_inpgate[ind_cr, :] = gene2.w_mem_inpgate[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_mem_inpgate)-1)
+                    gene2.w_mem_inpgate[ind_cr, :] = gene1.w_mem_inpgate[ind_cr, :]
+                else: continue
+
+            #BLOCK INPUTS
+            #Layer 1
+            num_cross_overs = randint(1, len(gene1.w_inp))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_inp)-1)
+                    gene1.w_inp[ind_cr, :] = gene2.w_inp[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_inp)-1)
+                    gene2.w_inp[ind_cr, :] = gene1.w_inp[ind_cr, :]
+                else: continue
+
+            #Layer 2
+            num_cross_overs = randint(1, len(gene1.w_rec_inp))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_rec_inp)-1)
+                    gene1.w_rec_inp[ind_cr, :] = gene2.w_rec_inp[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_rec_inp)-1)
+                    gene2.w_rec_inp[ind_cr, :] = gene1.w_rec_inp[ind_cr, :]
+                else: continue
+
+
+            #FORGET GATES
+            #Layer 1
+            num_cross_overs = randint(1, len(gene1.w_forgetgate))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_forgetgate)-1)
+                    gene1.w_forgetgate[ind_cr, :] = gene2.w_forgetgate[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_forgetgate)-1)
+                    gene2.w_forgetgate[ind_cr, :] = gene1.w_forgetgate[ind_cr, :]
+                else: continue
+
+            #Layer 2
+            num_cross_overs = randint(1, len(gene1.w_rec_forgetgate))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_rec_forgetgate)-1)
+                    gene1.w_rec_forgetgate[ind_cr, :] = gene2.w_rec_forgetgate[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_rec_forgetgate)-1)
+                    gene2.w_rec_forgetgate[ind_cr, :] = gene1.w_rec_forgetgate[ind_cr, :]
+                else: continue
+
+            #Layer 3
+            num_cross_overs = randint(1, len(gene1.w_mem_forgetgate))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_mem_forgetgate)-1)
+                    gene1.w_mem_forgetgate[ind_cr, :] = gene2.w_mem_forgetgate[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_mem_forgetgate)-1)
+                    gene2.w_mem_forgetgate[ind_cr, :] = gene1.w_mem_forgetgate[ind_cr, :]
+                else: continue
+
+            #OUTPUT WEIGHTS
+            num_cross_overs = randint(1, len(gene1.w_output))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_output)-1)
+                    gene1.w_output[ind_cr, :] = gene2.w_output[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_output)-1)
+                    gene2.w_output[ind_cr, :] = gene1.w_output[ind_cr, :]
+                else: continue
+
+            #MEMORY CELL (PRIOR)
+            #1-dimensional so point crossovers
+            num_cross_overs = randint(1, gene1.w_rec_forgetgate.shape[1])
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, gene1.w_rec_forgetgate.shape[1]-1)
+                    gene1.w_rec_forgetgate[0, ind_cr:] = gene2.w_rec_forgetgate[0, ind_cr:]
+                elif rand < 0.66:
+                    ind_cr = randint(0, gene1.w_rec_forgetgate.shape[1]-1)
+                    gene2.w_rec_forgetgate[0, :ind_cr] = gene1.w_rec_forgetgate[0, :ind_cr]
+                else: continue
+
+
+        else: #Normal net
+            #First layer
+            num_cross_overs = randint(1, len(gene1.w_01))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_01)-1)
+                    gene1.w_01[ind_cr, :] = gene2.w_01[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_01)-1)
+                    gene2.w_01[ind_cr, :] = gene1.w_01[ind_cr, :]
+                else: continue
+
+            #Second layer
+            num_cross_overs = randint(1, len(gene1.w_12))
+            for i in range(num_cross_overs):
+                rand = random.random()
+                if rand < 0.33:
+                    ind_cr = randint(0, len(gene1.w_12)-1)
+                    gene1.w_12[ind_cr, :] = gene2.w_12[ind_cr, :]
+                elif rand < 0.66:
+                    ind_cr = randint(0, len(gene1.w_12)-1)
+                    gene2.w_12[ind_cr, :] = gene1.w_12[ind_cr, :]
+                else: continue
+
+    def mutate_inplace(self, gene):
+        mut_strength = 0.2
+        num_mutation_frac = 0.2
+        super_mut_strength = 10
+        super_mut_prob = 0.05
+
+
+        if self.ssne_param.type_id == 'memoried': #Memory net
+            #INPUT GATES
+            #Layer 1
+            num_mutations = randint(1, int(num_mutation_frac*gene.w_inpgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_inpgate.shape[0]-1)
+                ind_dim2 = randint(0, gene.w_inpgate.shape[1]-1)
+                if random.random() < super_mut_prob: #Super mutation
+                    gene.w_inpgate[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * gene.w_inpgate[ind_dim1, ind_dim2])
+                else: #Normal mutation
+                    gene.w_inpgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_inpgate[ind_dim1, ind_dim2])
+
+            # Layer 2
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_rec_inpgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_rec_inpgate.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_rec_inpgate.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_rec_inpgate[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * gene.w_rec_inpgate[
+                        ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_rec_inpgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_rec_inpgate[
+                        ind_dim1, ind_dim2])
+
+            # Layer 3
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_mem_inpgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_mem_inpgate.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_mem_inpgate.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_mem_inpgate[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                           super_mut_strength * gene.w_mem_inpgate[
+                                                                               ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_mem_inpgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_mem_inpgate[
+                        ind_dim1, ind_dim2])
+
+
+
+            #BLOCK INPUTS
+            # Layer 1
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_inp.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_inp.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_inp.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_inp[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                           super_mut_strength * gene.w_inp[
+                                                                               ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_inp[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_inp[
+                        ind_dim1, ind_dim2])
+
+            # Layer 2
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_rec_inp.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_rec_inp.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_rec_inp.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_rec_inp[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                   super_mut_strength * gene.w_rec_inp[
+                                                                       ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_rec_inp[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_rec_inp[
+                        ind_dim1, ind_dim2])
+
+
+            #FORGET GATES
+            # Layer 1
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_forgetgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_forgetgate.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_forgetgate.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_forgetgate[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                           super_mut_strength * gene.w_forgetgate[
+                                                                               ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_forgetgate[
+                        ind_dim1, ind_dim2])
+
+            # Layer 2
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_rec_forgetgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_rec_forgetgate.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_rec_forgetgate.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_rec_forgetgate[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                          super_mut_strength * gene.w_rec_forgetgate[
+                                                                              ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_rec_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_rec_forgetgate[
+                        ind_dim1, ind_dim2])
+
+            # Layer 3
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_mem_forgetgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_mem_forgetgate.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_mem_forgetgate.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_mem_forgetgate[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                          super_mut_strength * gene.w_mem_forgetgate[
+                                                                              ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_mem_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_mem_forgetgate[
+                        ind_dim1, ind_dim2])
+
+            #OUTOUT WEIGHTS
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_output.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_output.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_output.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_output[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                           super_mut_strength * gene.w_output[
+                                                                               ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_output[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_output[
+                        ind_dim1, ind_dim2])
+
+            # MEMORY CELL (PRIOR)
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_forgetgate.size))
+            for i in range(num_mutations):
+                ind_dim1 = 0
+                ind_dim2 = randint(0, gene.w_forgetgate.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_forgetgate[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                          super_mut_strength * gene.w_forgetgate[
+                                                                              ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_forgetgate[
+                        ind_dim1, ind_dim2])
+
+
+
+
+        else: #Normal net
+            # Layer 1
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_01.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_01.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_01.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_01[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                           super_mut_strength * gene.w_01[
+                                                                               ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_01[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_01[
+                        ind_dim1, ind_dim2])
+
+            # Layer 2
+            num_mutations = randint(1, int(num_mutation_frac * gene.w_12.size))
+            for i in range(num_mutations):
+                ind_dim1 = randint(0, gene.w_12.shape[0] - 1)
+                ind_dim2 = randint(0, gene.w_12.shape[1] - 1)
+                if random.random() < super_mut_prob:  # Super mutation
+                    gene.w_12[ind_dim1, ind_dim2] += random.gauss(0,
+                                                                          super_mut_strength * gene.w_12[
+                                                                              ind_dim1, ind_dim2])
+                else:  # Normal mutation
+                    gene.w_12[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_12[
+                        ind_dim1, ind_dim2])
+
+    def epoch(self):
+        self.current_gen += 1
+        # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
+        index_rank = self.list_argsort(self.fitness_evals); index_rank.reverse()
+        elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard
+
+        # Selection step
+        offsprings = self.selection_tournament(index_rank, num_offsprings=len(index_rank) - self.num_elitists, tournament_size=3)
+
+        #Figure out unselected candidates
+        unselects = []; new_elitists = []
+        for i in range(self.population_size):
+            if i in offsprings or i in elitist_index: continue
+            else: unselects.append(i)
+        random.shuffle(unselects)
+
+        #Elitism step, assigning eleitst candidates to some unselects
+        for i in elitist_index:
+            replacee = unselects.pop(0)
+            new_elitists.append(replacee)
+            self.pop[replacee] = copy.deepcopy(self.pop[i])
+
+        # Crossover for unselected genes with 100 percent probability
+        if len(unselects) % 2 != 0: #Number of unselects left should be even
+            unselects.append(unselects[randint(0, len(unselects) - 1)])
+        for i, j in zip(unselects[0::2], unselects[1::2]):
+            off_i = random.choice(new_elitists); off_j = random.choice(offsprings)
+            self.pop[i] = copy.deepcopy(self.pop[off_i])
+            self.pop[j] = copy.deepcopy(self.pop[off_j])
+            self.crossover_inplace(self.pop[i], self.pop[j])
+
+        # Crossover for selected offsprings
+        for i,j in zip(offsprings[0::2], offsprings[1::2]):
+            if random.random() < self.ssne_param.crossover_prob: self.crossover_inplace(self.pop[i], self.pop[j])
+
+
+        #Mutate all genes in the population except the new elitists
+        for i in range(self.population_size):
+            if i not in new_elitists: #Spare the new elitists
+                if random.random() < self.ssne_param.mutation_prob:
+                    self.mutate_inplace(self.pop[i])
 
 class Deap_evo:
 
@@ -514,7 +917,15 @@ class Evo_net():
         self.parameters = parameters
         self.type = type
 
-        if parameters.use_deap:
+
+        if parameters.use_ssne:
+            if self.type == 'prey': self.ssne_param = self.parameters.deap_param_prey
+            else: self.ssne_param = self.parameters.deap_param_predator
+            self.ssne_handle = SSNE(self.parameters, self.ssne_param)
+            self.fitness_evals = [[] for x in xrange(self.parameters.population_size)]
+            self.current_individual = None
+
+        elif parameters.use_deap:
             if self.type == 'prey':
                 deap_param = self.parameters.deap_param_prey
             else:
@@ -598,7 +1009,10 @@ class Evo_net():
         return sorted(range(len(seq)), key=seq.__getitem__)
 
     def epoch(self): #Method to complete epoch after fitness has been assigned to the genomes
-        if self.parameters.use_deap:
+        if self.parameters.use_ssne:
+            self.ssne_handle.epoch()
+
+        elif self.parameters.use_deap:
 
             # Elitist reserve
             elitist_reserve = []
@@ -636,7 +1050,11 @@ class Evo_net():
 
     def referesh_genome_list(self):
 
-        if self.parameters.use_deap:
+        if self.parameters.use_ssne:
+            #self.fitness_evals = [[] for x in xrange(self.parameters.population_size)]
+            return
+
+        elif self.parameters.use_deap:
             self.fitness_evals = [[] for x in xrange(self.parameters.population_size)]
             return
 
@@ -655,7 +1073,11 @@ class Evo_net():
         #     return
 
     def build_net(self, index):
-        if self.parameters.use_deap:
+        if self.parameters.use_ssne:
+            self.current_individual = index
+            return
+
+        elif self.parameters.use_deap:
             self.net.set_weights(self.pop[index])
             return
 
@@ -673,7 +1095,13 @@ class Evo_net():
 
     # Get action choice from Evo-net
     def run_evo_net(self, state, is_hof):
-        if self.parameters.use_deap:
+
+        if self.parameters.use_ssne:
+            if is_hof: output = self.ssne_handle.hof_net.feedforward(state)
+            else: output = self.ssne_handle.pop[self.current_individual].feedforward(state)
+            return output
+
+        elif self.parameters.use_deap:
             if is_hof: output = self.hof_net.feedforward(state)
             else: output = self.net.feedforward(state)
             return output
@@ -706,9 +1134,24 @@ class Evo_net():
 
         return action
 
-    def update_fitness(self): #Update the fitnesses of the genome and also encode the best one for the generation
+    def update_fitness(self): #Update the fitnesses of the genome and also update HOF net
 
-        if self.parameters.use_deap:
+        if self.parameters.use_ssne:
+
+            #Encode fitness
+            for i in range(self.parameters.population_size):
+                if len(self.fitness_evals[i]) != 0:  # if fitness evals is not empty (wasnt evaluated)
+                    if self.parameters.leniency: avg_fitness = max(self.fitness_evals[i]) #Use lenient learner
+                    else: avg_fitness = sum(self.fitness_evals[i])/len(self.fitness_evals[i])
+                    self.ssne_handle.fitness_evals[i] = avg_fitness
+
+           #Update hof_net
+            self.ssne_handle.hof_net = copy.deepcopy(self.ssne_handle.pop[self.ssne_handle.fitness_evals.index(max(self.ssne_handle.fitness_evals))])
+
+            #Reset fitness list
+            self.fitness_evals = [[] for x in xrange(self.parameters.population_size)]
+
+        elif self.parameters.use_deap:
             best = -1000000000; best_index = None
             for i in range(self.parameters.population_size):
                 if len(self.fitness_evals[i]) != 0:  # if fitness evals is not empty (wasnt evaluated)
@@ -720,8 +1163,7 @@ class Evo_net():
                         best_index = i
                     self.pop[i].fitness.values = avg_fitness,
 
-        #Update hof_net
-        if self.parameters.use_deap:
+           #Update hof_net
             self.hof_net.set_weights(self.pop[best_index])
 
 
