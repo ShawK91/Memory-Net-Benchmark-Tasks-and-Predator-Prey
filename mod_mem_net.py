@@ -49,7 +49,7 @@ class normal_net:
         return ans
 
     def fast_sigmoid(self, layer_input): #Sigmoid transform
-        for i in layer_input: i = i / (1 + math.fabs(i))
+        for i in layer_input: i[0] = i / (1 + math.fabs(i))
         return layer_input
 
     def softmax(self, layer_input): #Softmax transform
@@ -62,17 +62,22 @@ class normal_net:
             input = np.concatenate((input, [1.0]))
         return np.mat(input)
 
+    def format_mat(self, input):
+        ig = np.mat([1])
+        return np.concatenate((input, ig))
+
     def feedforward(self, input): #Feedforwards the input and computes the forward pass of the network
         #First hidden layer
         self.input = self.format_input(input) #Format and add bias term at the end
-        self.z1 = self.linear_combination(self.w_01, self.input.transpose()) #Forward pass linear
-        self.z1 = self.format_input(self.z1, False)#Format
-        self.h1 = self.fast_sigmoid(self.z1) #Use Relu transform
+        z1 = self.linear_combination(self.w_01, self.input.transpose()) #Forward pass linear
+        z1 = self.format_input(z1, False)#Format
+        h1 = self.fast_sigmoid(z1) #Use fast sigmoid transform
 
         #Output layer
-        self.h1 = np.vstack((self.h1,[1])) #Add bias term
-        self.z2 = self.w_12 * self.h1 #Forward pass linear
-        self.net_output = (self.fast_sigmoid((self.z2))) #Use sigmoid transform
+        #h1 = np.vstack((h1,[1])) #Add bias term
+        h1 = self.format_mat(h1)
+        z2 = self.w_12 * h1 #Forward pass linear
+        self.net_output = (self.fast_sigmoid((z2))) #Use sigmoid transform
         return np.array(self.net_output).tolist()
 
     def get_weights(self):
@@ -119,8 +124,6 @@ class memory_net:
         #Output weights
         self.w_output = np.mat(np.random.normal(mean, std, num_output*(num_hnodes + 1)))
         self.w_output = np.mat(np.reshape(self.w_output, (num_output, (num_hnodes + 1)))) #Reshape the array to the weight matrix
-
-
 
     def linear_combination(self, w_matrix, layer_input): #Linear combine weights with inputs
         return np.dot(w_matrix, layer_input) #Linear combination of weights and inputs
