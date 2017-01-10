@@ -668,6 +668,10 @@ class SSNE:
                 if random.random() < self.ssne_param.mutation_prob:
                     self.mutate_inplace(self.pop[i])
 
+    def save_pop(self, filename = 'Pop'):
+        filename = str(self.current_gen) + '_' + filename
+        pickle_object(self.pop, filename)
+
 class Deap_evo:
 
     def __init__(self, parameters):
@@ -1619,21 +1623,25 @@ class Gridworld:
         for predator in self.predator_list: #Move and predator
             action = predator.action
             next_pos = np.copy(predator.position) #Backup
-            next_pos[0] += action[0]; next_pos[1] += action[1] #Compute new locations
+            next_pos[0] += action[0][0]; next_pos[1] += action[1][0] #Compute new locations
 
             # Implement bounds
-            if next_pos[0] >= self.dim_row or next_pos[0] < 0: next_pos[0] = predator.position[0]
-            if next_pos[1] >= self.dim_row or next_pos[1] < 0: next_pos[1] = predator.position[1]
+            if next_pos[0] >= self.dim_row: next_pos[0] = self.dim_row - 1
+            elif next_pos[0] < 0: next_pos[0] = 0
+            if next_pos[1] >= self.dim_col: next_pos[1] = self.dim_col - 1
+            elif next_pos[1] < 0: next_pos[1] = 0
             predator.position[0] = next_pos[0]; predator.position[1] = next_pos[1] #Update new positions for the predator object
 
         for prey in self.prey_list: #Move and predator
             action = prey.action
             next_pos = np.copy(prey.position) #Backup
-            next_pos[0] += action[0]; next_pos[1] += action[1] #Compute new locations
+            next_pos[0] += action[0][0]*self.parameters.prey_speed_boost; next_pos[1] += action[1][0]*self.parameters.prey_speed_boost #Compute new locations
 
             # Implement bounds
-            if next_pos[0] >= self.dim_row or next_pos[0] < 0: next_pos[0] = prey.position[0]
-            if next_pos[1] >= self.dim_row or next_pos[1] < 0: next_pos[1] = prey.position[1]
+            if next_pos[0] >= self.dim_row: next_pos[0] = self.dim_row - 1
+            elif next_pos[0] < 0: next_pos[0] = 0
+            if next_pos[1] >= self.dim_col: next_pos[1] = self.dim_col - 1
+            elif next_pos[1] < 0: next_pos[1] = 0
             prey.position[0] = next_pos[0]; prey.position[1] = next_pos[1] #Update new positions for the predator object
 
     def get_state(self, agent, state_representation = None):  # Returns a flattened array around the predator position
@@ -1653,7 +1661,7 @@ class Gridworld:
                     y2 = 0
                     angle, dist = self.get_angle_dist(x1, y1, x2, y2)
                     bracket = int(angle / self.angle_res)
-                    dist_prey_list[bracket].append(dist / (2.0 * self.dim_col))
+                    dist_prey_list[bracket].append(dist / (1.4 * self.dim_col))
 
 
             for other_predator in self.predator_list:
@@ -1664,7 +1672,7 @@ class Gridworld:
                     y2 = 0
                     angle, dist = self.get_angle_dist(x1, y1, x2, y2)
                     bracket = int(angle / self.angle_res)
-                    dist_predator_list[bracket].append(dist / (2.0 * self.dim_col))
+                    dist_predator_list[bracket].append(dist / (1.4 * self.dim_col))
 
             if self.parameters.sensor_avg:
                 for bracket in range(len(dist_predator_list)):
@@ -1887,6 +1895,10 @@ class keras_Population(): #Keras population
                 # if (randint(1, 100) == 5):  # SUPER MUTATE
                 #     w[i][j][k] += np.random.normal(-1 * much_strength, 1 * much_strength)
         model_out.set_weights(w)  # Save weights
+
+def pickle_object(obj, filename):
+    with open(filename, 'wb') as output:
+        cPickle.dump(obj, output, -1)
 
 def vizualize_trajectory(filename = 'trajectory.csv'):
     print

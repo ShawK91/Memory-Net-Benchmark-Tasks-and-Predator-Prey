@@ -49,7 +49,7 @@ class SSNE_param:
 
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
-        self.mutation_prob = 0.9
+        self.mutation_prob = 0.7
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -71,7 +71,7 @@ class SSNE_param:
 
 class Parameters:
     def __init__(self):
-            self.population_size = 10
+            self.population_size = 100
             self.depth = 5
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
@@ -98,7 +98,6 @@ class Parameters:
 
 parameters = Parameters() #Create the Parameters class
 tracker = tracker(parameters) #Initiate tracker
-
 
 class Sequence_recall:
     def __init__(self, parameters):
@@ -204,9 +203,6 @@ class Sequence_recall:
             #reward += net_output[-1] * target
 
         return reward/(self.parameters.repeat_trials * test_boost)
-
-
-
 
 if __name__ == "__main__":
 

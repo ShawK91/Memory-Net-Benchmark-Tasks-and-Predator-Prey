@@ -7,7 +7,7 @@ from random import randint#, choice
 class Deap_param:
     def __init__(self, angle_res, is_memoried):
         self.num_input = (360 * 2 / angle_res)
-        self.num_hnodes = 10
+        self.num_hnodes = 15
         self.num_output = 2
         if is_memoried: self.type_id = 'memoried'
         else: self.type_id = 'normal'
@@ -40,16 +40,17 @@ class Parameters:
             self.grid_row = 15
             self.grid_col = 15
             self.total_steps = 20 # Total roaming steps without goal before termination
-            self.num_predator = 1
-            self.num_prey= 1
+            self.num_predator = 2
+            self.num_prey= 2
             self.predator_random = 0
-            self.prey_random = 1
+            self.prey_random = 0
             self.total_generations = 10000
             self.angle_res = 45
             self.observing_prob = 0.5
 
-            self.is_memoried_predator = 1
-            self.is_memoried_prey = 0
+            self.is_memoried_predator = 0
+            self.is_memoried_prey = 1
+            self.prey_speed_boost = 2
 
             #DEAP/SSNE stuff
             self.use_ssne = 1
