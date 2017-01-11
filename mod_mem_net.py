@@ -1235,6 +1235,9 @@ class Prey:
         self.observation_log = []
         self.min_approach_log = np.zeros(self.parameters.num_predator) + self.parameters.grid_row + self.parameters.grid_col
 
+
+        
+
     def init_prey(self, grid, is_new_epoch=True):
         if not is_new_epoch: #If not a new epoch and intra epoch (random already initialized)
             x = self.spawn_position[0]; y = self.spawn_position[1]
@@ -1681,7 +1684,17 @@ class Gridworld:
                     try: state[bracket][1] = sum(dist_predator_list[bracket]) / len(dist_predator_list[bracket])  # Encode average predator distance
                     except: None
 
-            state = np.reshape(state, (1, 360 / self.angle_res * 2))  # Flatten array
+
+            state = state.flatten()
+
+            #Wall sensor
+            state = np.concatenate((state, np.zeros(4)))
+            state[-4] = agent.position[0] / self.parameters.grid_row
+            state[-3] = (self.parameters.grid_col - agent.position[1]) / self.parameters.grid_col
+            state[-2] = (self.parameters.grid_row - agent.position[0]) / self.parameters.grid_row
+            state[-1] = agent.position[1] / self.parameters.grid_col
+
+            state = np.reshape(state, (1, (360 / self.angle_res * 2) + 4))  # Flatten array
 
         if state_representation == 2:  # List predator/prey representation fully obserbavle
             state = np.zeros(self.num_predators * 2 + self.num_prey * 2)

@@ -34,7 +34,6 @@ class tracker(): #Tracker
             self.hof_tr_avg_fit.append(np.array([generation, self.hof_avg_fitness]))
             np.savetxt(filename, np.array(self.hof_tr_avg_fit), fmt='%.3f', delimiter=',')
 
-
     def save_csv(self, generation, filename):
         self.tr_avg_fit.append(np.array([generation, self.avg_fitness]))
         np.savetxt(filename, np.array(self.tr_avg_fit), fmt='%.3f', delimiter=',')
@@ -42,14 +41,14 @@ class tracker(): #Tracker
 class SSNE_param:
     def __init__(self, is_memoried):
         self.num_input = 1
-        self.num_hnodes = 10
+        self.num_hnodes = 5
         self.num_output = 1
         if is_memoried: self.type_id = 'memoried'
         else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
-        self.mutation_prob = 0.7
+        self.mutation_prob = 0.5
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -75,7 +74,7 @@ class Parameters:
             self.depth = 5
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
-            self.is_memoried = 0
+            self.is_memoried = 1
             self.repeat_trials = 5
 
             #DEAP/SSNE stuff
@@ -209,7 +208,7 @@ if __name__ == "__main__":
     task = Sequence_recall(parameters)
     for gen in range(parameters.total_gens):
         epoch_reward, hof_score = task.evolve()
-        print 'Generation: ', gen, ' Epoch_reward: ', epoch_reward, '   HOF Score: ', hof_score
+        print 'Generation:', gen, ' Epoch_reward:', epoch_reward, '  Score:', hof_score, '  Cumul_Score:', tracker.hof_avg_fitness
         tracker.add_fitness(epoch_reward, gen)  # Add average global performance to tracker
         tracker.add_hof_fitness(hof_score, gen)  # Add average global performance to tracker
 

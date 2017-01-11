@@ -6,7 +6,7 @@ from random import randint#, choice
 
 class Deap_param:
     def __init__(self, angle_res, is_memoried):
-        self.num_input = (360 * 2 / angle_res)
+        self.num_input = (360 * 2 / angle_res) + 4
         self.num_hnodes = 15
         self.num_output = 2
         if is_memoried: self.type_id = 'memoried'
@@ -14,7 +14,7 @@ class Deap_param:
 
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
-        self.mutation_prob = 0.9
+        self.mutation_prob = 0.5
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -39,18 +39,18 @@ class Parameters:
             self.population_size = 10
             self.grid_row = 15
             self.grid_col = 15
-            self.total_steps = 20 # Total roaming steps without goal before termination
+            self.total_steps = 15 # Total roaming steps without goal before termination
             self.num_predator = 2
             self.num_prey= 2
             self.predator_random = 0
             self.prey_random = 0
             self.total_generations = 10000
-            self.angle_res = 45
+            self.angle_res = 90
             self.observing_prob = 0.5
 
             self.is_memoried_predator = 0
             self.is_memoried_prey = 1
-            self.prey_speed_boost = 2
+            self.prey_speed_boost = 5
 
             #DEAP/SSNE stuff
             self.use_ssne = 1
@@ -64,7 +64,7 @@ class Parameters:
             if True:
                 # GIVEN
 
-                self.D_reward = 0  # D reward scheme
+                self.D_reward = 1  # D reward scheme
                 self.prey_global = 0 #Prey's reward scheme
                 self.wheel_action = 0
 
@@ -283,7 +283,7 @@ def evolve(gridworld, parameters, generation, best_hof_score):
 
     for predator in gridworld.predator_list:
         predator.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
-        predator.evo_net.epoch() #Run Epoch update in the population
+        #predator.evo_net.epoch() #Run Epoch update in the population
     for prey in gridworld.prey_list:
         prey.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
         prey.evo_net.epoch() #Run Epoch update in the population
@@ -291,6 +291,7 @@ def evolve(gridworld, parameters, generation, best_hof_score):
     #HOF VS simulation
     hof_reward, hof_predator_rewards, hof_prey_rewards = run_simulation(parameters, gridworld, teams=None, is_hof = True)
 
+    #TODO Check HOF ASSIGNMENT
 
 
     epoch_metrics = np.array(epoch_metrics)
