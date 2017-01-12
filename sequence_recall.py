@@ -48,7 +48,7 @@ class SSNE_param:
 
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
-        self.mutation_prob = 0.5
+        self.mutation_prob = 0.7
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (

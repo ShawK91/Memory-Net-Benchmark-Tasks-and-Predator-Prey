@@ -36,33 +36,34 @@ class Deap_param:
 
 class Parameters:
     def __init__(self):
-            self.population_size = 10
+            self.population_size = 100
             self.grid_row = 15
             self.grid_col = 15
             self.total_steps = 15 # Total roaming steps without goal before termination
             self.num_predator = 2
-            self.num_prey= 2
+            self.num_prey= 1
             self.predator_random = 0
-            self.prey_random = 0
+            self.prey_random = 1
             self.total_generations = 10000
-            self.angle_res = 90
-            self.observing_prob = 0.5
+            self.angle_res = 45
+            self.observing_prob = 1
 
-            self.is_memoried_predator = 0
-            self.is_memoried_prey = 1
+            self.is_memoried_predator = 1
+            self.is_memoried_prey = 0
+
             self.prey_speed_boost = 5
-
-            #DEAP/SSNE stuff
-            self.use_ssne = 1
-            self.use_deap = 0
-            if self.use_deap or self.use_ssne:
-                self.deap_param_predator = Deap_param(self.angle_res, self.is_memoried_predator)
-                self.deap_param_prey = Deap_param(self.angle_res, self.is_memoried_prey)
-
+            self.periodic_poi_mode = 1
+            self.period = 3
 
             #Tertiary Variables (Closed for cleanliness) Open to modify
             if True:
                 # GIVEN
+                # DEAP/SSNE stuff
+                self.use_ssne = 1
+                self.use_deap = 0
+                if self.use_deap or self.use_ssne:
+                    self.deap_param_predator = Deap_param(self.angle_res, self.is_memoried_predator)
+                    self.deap_param_prey = Deap_param(self.angle_res, self.is_memoried_prey)
 
                 self.D_reward = 1  # D reward scheme
                 self.prey_global = 0 #Prey's reward scheme
@@ -283,10 +284,11 @@ def evolve(gridworld, parameters, generation, best_hof_score):
 
     for predator in gridworld.predator_list:
         predator.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
-        #predator.evo_net.epoch() #Run Epoch update in the population
-    for prey in gridworld.prey_list:
-        prey.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
-        prey.evo_net.epoch() #Run Epoch update in the population
+        predator.evo_net.epoch() #Run Epoch update in the population
+    if not parameters.periodic_poi_mode:
+        for prey in gridworld.prey_list:
+            prey.evo_net.update_fitness()# Assign fitness to genomes and update HOF net
+            prey.evo_net.epoch() #Run Epoch update in the population
 
     #HOF VS simulation
     hof_reward, hof_predator_rewards, hof_prey_rewards = run_simulation(parameters, gridworld, teams=None, is_hof = True)
@@ -308,6 +310,7 @@ def run_simulation(parameters, gridworld, teams, is_test = False, is_hof = False
     for steps in range(parameters.total_steps):  # One training episode till goal is not reached
         if is_test: ig_traj_log = []
 
+
         for id, predator in enumerate(gridworld.predator_list):  #get all the action choices from the predators
             predator.perceived_state = gridworld.get_state(predator) #Update all predator's perceived state
             if is_test:
@@ -318,13 +321,17 @@ def run_simulation(parameters, gridworld, teams, is_test = False, is_hof = False
                 predator.take_action(is_hof) #Make the predator take action using the Evo-net with given id from the population
 
         for id, prey in enumerate(gridworld.prey_list):  #get all the action choices from the predators
-            prey.perceived_state = gridworld.get_state(prey) #Update all predator's perceived state
-            if is_test:
-                prey.take_action_test()
-                ig_traj_log.append(prey.position[0])
-                ig_traj_log.append(prey.position[1])
+            #print prey.visible
+            if parameters.periodic_poi_mode:
+                prey.periodic_visibility(steps)  # Periodic POIs
             else:
-                prey.take_action(is_hof) #Make the predator take action using the Evo-net with given id from the population
+                prey.perceived_state = gridworld.get_state(prey) #Update all predator's perceived state
+                if is_test:
+                    prey.take_action_test()
+                    ig_traj_log.append(prey.position[0])
+                    ig_traj_log.append(prey.position[1])
+                else:
+                    prey.take_action(is_hof) #Make the predator take action using the Evo-net with given id from the population
 
         gridworld.move() #Move gridworld
 
@@ -361,15 +368,17 @@ if __name__ == "__main__":
     best_hof_score = 0
 
     for gen in range (parameters.total_generations): #Main Loop
-        #curtime = time.time()
+        curtime = time.time()
         avg_epoch, sd_epoch, hof_reward = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
         tracker.add_fitness(avg_epoch, gen) #Add average global performance to tracker
         tracker.add_hof_fitness(hof_reward, gen)  # Add hof global performance to tracker
-        #elapsed = time.time() - curtime
+        elapsed = time.time() - curtime
+
+        print elapsed
 
 
-        print 'Gen:', gen,'Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
-            , ' HOF Reward:', int(hof_reward),' Cumul_hof_avg:',int(tracker.hof_avg_fitness), '  Avg epoch:',int(avg_epoch), ' Sd_epoch:',int(sd_epoch),  '  Cumul_Avg:',int(tracker.avg_fitness)
+        #print 'Gen:', gen,'Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
+            #, ' HOF Reward:', int(hof_reward),' Cumul_hof_avg:',int(tracker.hof_avg_fitness), '  Avg epoch:',int(avg_epoch), ' Sd_epoch:',int(sd_epoch),  '  Cumul_Avg:',int(tracker.avg_fitness)
 
 
 

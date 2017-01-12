@@ -5,13 +5,14 @@ from random import randint
 #from keras.layers.advanced_activations import SReLU
 #from keras.regularizers import l2, activity_l2
 #from keras.optimizers import SGD
-from deap import base
-from deap import creator
-from deap import tools
+#from deap import base
+#from deap import creator
+#from deap import tools
 import math, copy
-import MultiNEAT as NEAT
+#import MultiNEAT as NEAT
 import numpy as np, time
 import random
+from scipy.special import expit
 #import pickle
 #import neat as py_neat
 #from neat import nn
@@ -48,8 +49,9 @@ class normal_net:
 
         return ans
 
-    def fast_sigmoid(self, layer_input): #Sigmoid transform
-        for i in layer_input: i[0] = i / (1 + math.fabs(i))
+    def fast_sigmoid(self, layer_input):  # Sigmoid transform
+        layer_input = expit(layer_input)
+        # for i in layer_input: i[0] = i / (1 + math.fabs(i))
         return layer_input
 
     def softmax(self, layer_input): #Softmax transform
@@ -148,12 +150,8 @@ class memory_net:
         return ans
 
     def fast_sigmoid(self, layer_input): #Sigmoid transform
-        for i in layer_input: i[0] = i / (1 + math.fabs(i))
-        return layer_input
-
-    def gated_fast_sigmoid(self, layer_input): #Sigmoid transform between 0 and 1
-        for i in layer_input:
-            i[0] = 0.5 * (i / (1 + math.fabs(i))) + 0.5
+        layer_input = expit(layer_input)
+        #for i in layer_input: i[0] = i / (1 + math.fabs(i))
         return layer_input
 
     def softmax(self, layer_input): #Softmax transform
@@ -180,7 +178,7 @@ class memory_net:
         ig_2 = self.linear_combination(self.w_rec_inpgate, last_output)
         ig_3 = self.linear_combination(self.w_mem_inpgate, last_memory)
         input_gate_out = ig_1 + ig_2 + ig_3
-        input_gate_out = self.gated_fast_sigmoid(input_gate_out)
+        input_gate_out = self.fast_sigmoid(input_gate_out)
 
         #Input processing
         ig_1 = self.linear_combination(self.w_inp, self.input)
@@ -196,7 +194,7 @@ class memory_net:
         ig_2 = self.linear_combination(self.w_rec_forgetgate, last_output)
         ig_3 = self.linear_combination(self.w_mem_forgetgate, last_memory)
         forget_gate_out = ig_1 + ig_2 + ig_3
-        forget_gate_out = self.gated_fast_sigmoid(forget_gate_out)
+        forget_gate_out = self.fast_sigmoid(forget_gate_out)
 
         #Memory Output
         memory_output = np.multiply(forget_gate_out, self.memory_cell)
@@ -1235,8 +1233,32 @@ class Prey:
         self.observation_log = []
         self.min_approach_log = np.zeros(self.parameters.num_predator) + self.parameters.grid_row + self.parameters.grid_col
 
+        #Periodicity
+        self.visible = True
+        self.period = parameters.period
+        self.previous_actions = [0, 0]
 
-        
+
+
+    def periodic_visibility(self, step):
+        ig = step + self.team_role_index
+        ig = int(ig / self.period)
+        ig = ig % 2
+        self.visible = ig
+
+
+    def take_periodic_action(self):
+        if self.parameters.periodic_poi:
+            action_choice = self.previous_actions[0]
+            action_choice = (action_choice % 4) + 1
+            self.previous_actions[0] = self.previous_actions[1]
+            self.previous_actions[1] = action_choice
+
+            # self.previous_actions[0] = self.previous_actions[1]
+            # self.previous_actions[1] = self.previous_actions[2]
+            # self.previous_actions[2] = action_choice
+            #print self.previous_actions, action_choice
+            return action_choice
 
     def init_prey(self, grid, is_new_epoch=True):
         if not is_new_epoch: #If not a new epoch and intra epoch (random already initialized)
@@ -1325,6 +1347,10 @@ class Prey:
 
     def take_action(self, is_hof):
         #Modify state input to required input format
+
+        if self.parameters.periodic_poi_mode: #No prey, but periodic poi
+            self.action = 0
+            return
         evo_input = np.reshape(self.perceived_state, (self.perceived_state.shape[1]))  # State input only (Strictly Darwinian approach)
         self.action = self.evo_net.run_evo_net(evo_input, is_hof) #Take action
 
@@ -1626,7 +1652,7 @@ class Gridworld:
         for predator in self.predator_list: #Move and predator
             action = predator.action
             next_pos = np.copy(predator.position) #Backup
-            next_pos[0] += action[0][0]; next_pos[1] += action[1][0] #Compute new locations
+            next_pos[0] += 2 * (action[0][0] - 0.5); next_pos[1] += 2 * (action[1][0] - 0.5) #Compute new locations
 
             # Implement bounds
             if next_pos[0] >= self.dim_row: next_pos[0] = self.dim_row - 1
@@ -1635,6 +1661,7 @@ class Gridworld:
             elif next_pos[1] < 0: next_pos[1] = 0
             predator.position[0] = next_pos[0]; predator.position[1] = next_pos[1] #Update new positions for the predator object
 
+        if self.parameters.periodic_poi_mode: return
         for prey in self.prey_list: #Move and predator
             action = prey.action
             next_pos = np.copy(prey.position) #Backup
@@ -1657,7 +1684,7 @@ class Gridworld:
                 dist_predator_list = [[] for x in xrange(360 / self.angle_res)]
 
             for prey in self.prey_list:
-                if prey != agent and prey.is_caught == False and random.random() < self.parameters.observing_prob:  # FOR ALL preysS MINUS MYSELF
+                if prey != agent and prey.is_caught == False and random.random() < self.parameters.observing_prob and prey.visible:  # FOR ALL preysS MINUS MYSELF
                     x1 = prey.position[0] - agent.position[0];
                     x2 = -1
                     y1 = prey.position[1] - agent.position[1];
@@ -2491,7 +2518,7 @@ def referesh_state(self, current_state, predator_id, use_rnn):
 
 def pstats():
     import pstats
-    p = pstats.Stats('output.file')
+    p = pstats.Stats('profile.profile')
     p.sort_stats('cumulative').print_stats(10)
     p.sort_stats('cumulative').print_stats(50)
     p.sort_stats('cumulative').print_stats(50)
