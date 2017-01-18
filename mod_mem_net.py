@@ -417,7 +417,7 @@ class SSNE:
 
             #MEMORY CELL (PRIOR)
             #1-dimensional so point crossovers
-            num_cross_overs = randint(1, gene1.w_rec_forgetgate.shape[1])
+            num_cross_overs = randint(1, int(gene1.w_rec_forgetgate.shape[1]/2))
             for i in range(num_cross_overs):
                 rand = random.random()
                 if rand < 0.33:
@@ -1937,6 +1937,7 @@ class keras_Population(): #Keras population
         model_out.set_weights(w)  # Save weights
 
 def pickle_object(obj, filename):
+    import cPickle
     with open(filename, 'wb') as output:
         cPickle.dump(obj, output, -1)
 

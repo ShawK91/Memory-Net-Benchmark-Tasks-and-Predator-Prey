@@ -1,13 +1,17 @@
-import numpy as np, time
+import numpy as np, os
 #import MultiNEAT as NEAT
 import mod_mem_net as mod, sys
-from random import randint#, choice
+from random import randint
 import random
 
+save_foldername = 'RSeq_classifier'
 class tracker(): #Tracker
-    def __init__(self, parameters):
+    def __init__(self, parameters, foldername = save_foldername):
+        self.foldername = foldername
         self.fitnesses = []; self.avg_fitness = 0; self.tr_avg_fit = []
         self.hof_fitnesses = []; self.hof_avg_fitness = 0; self.hof_tr_avg_fit = []
+        if not os.path.exists(foldername):
+            os.makedirs(foldername)
         if parameters.is_memoried:
             self.file_save = 'mem_seq_classifier.csv'
         else:
@@ -20,7 +24,7 @@ class tracker(): #Tracker
             self.fitnesses.pop(0)
         self.avg_fitness = sum(self.fitnesses)/len(self.fitnesses)
         if generation % 10 == 0: #Save to csv file
-            filename = 'rough_' + self.file_save
+            filename = self.foldername + '/rough_' + self.file_save
             self.tr_avg_fit.append(np.array([generation, self.avg_fitness]))
             np.savetxt(filename, np.array(self.tr_avg_fit), fmt='%.3f', delimiter=',')
 
@@ -30,7 +34,7 @@ class tracker(): #Tracker
             self.hof_fitnesses.pop(0)
         self.hof_avg_fitness = sum(self.hof_fitnesses)/len(self.hof_fitnesses)
         if generation % 10 == 0: #Save to csv file
-            filename = 'hof_' + self.file_save
+            filename = self.foldername + '/hof_' + self.file_save
             self.hof_tr_avg_fit.append(np.array([generation, self.hof_avg_fitness]))
             np.savetxt(filename, np.array(self.hof_tr_avg_fit), fmt='%.3f', delimiter=',')
 
@@ -47,8 +51,8 @@ class SSNE_param:
         else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
-        self.crossover_prob = 0.2
-        self.mutation_prob = 0.7
+        self.crossover_prob = 0.3
+        self.mutation_prob = 0.9
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -75,14 +79,14 @@ class Parameters:
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
             self.is_memoried = 1
-            self.repeat_trials = 5
+            self.repeat_trials = 10
 
             #DEAP/SSNE stuff
             self.use_ssne = 1
             self.use_deap = 0
             if self.use_deap or self.use_ssne:
                 self.ssne_param = SSNE_param( self.is_memoried)
-            self.total_gens = 10000
+            self.total_gens = 15000
 
             #Reward scheme
             #1 Block continous reward - End decision matters
@@ -165,7 +169,7 @@ class Sequence_recall:
             net_output = []
             for inp in input: #Run network to get output
                 inp=np.array([inp])
-                net_output.append(self.agent.pop[index].feedforward(inp)[0][0])
+                net_output.append((self.agent.pop[index].feedforward(inp)[0][0] - 0.5) * 2)
             reward += self.get_reward(input, net_output) #get reward or fitness of the individual
 
         #print net_output
@@ -177,11 +181,16 @@ class Sequence_recall:
         best_epoch_reward = -1000000
         for i in range(self.parameters.population_size): #Test all genomes/individuals
             reward = self.run_simulation(i)
-        if reward > best_epoch_reward: best_epoch_reward = reward
+            if reward > best_epoch_reward: best_epoch_reward = reward
 
         #HOF test net
         hof_index = self.agent.fitness_evals.index(max(self.agent.fitness_evals))
         hof_score = self.test_net(hof_index)
+
+        #Save population and HOF
+        if (gen + 1) % 1000 == 0:
+            mod.pickle_object(self.agent.pop, save_foldername + '/seq_classification_pop_' + str(gen))
+            mod.pickle_object(self.agent.pop[hof_index], save_foldername + '/seq_classification_hof_' + str(gen))
 
         self.agent.epoch()
         return best_epoch_reward, hof_score
@@ -194,7 +203,7 @@ class Sequence_recall:
             net_output = []
             for inp in input: #Run network to get output
                 inp=np.array([inp])
-                net_output.append(self.agent.pop[index].feedforward(inp)[0][0])
+                net_output.append((self.agent.pop[index].feedforward(inp)[0][0] - 0.5) * 2)
             target = sum(input)
             if target > 1: target = 1
             elif target < -1: target = -1
@@ -210,7 +219,7 @@ if __name__ == "__main__":
         epoch_reward, hof_score = task.evolve()
         print 'Generation:', gen, ' Epoch_reward:', epoch_reward, '  Score:', hof_score, '  Cumul_Score:', tracker.hof_avg_fitness
         tracker.add_fitness(epoch_reward, gen)  # Add average global performance to tracker
-        tracker.add_hof_fitness(hof_score, gen)  # Add average global performance to tracker
+        tracker.add_hof_fitness(hof_score, gen)  # Add best global performance to tracker
 
 
 
