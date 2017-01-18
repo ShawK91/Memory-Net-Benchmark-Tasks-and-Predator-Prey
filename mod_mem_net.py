@@ -2523,3 +2523,13 @@ def pstats():
     p.sort_stats('cumulative').print_stats(10)
     p.sort_stats('cumulative').print_stats(50)
     p.sort_stats('cumulative').print_stats(50)
+
+def unpickle(filename = 'def.pickle'):
+    import pickle
+    with open(filename, 'rb') as handle:
+        b = pickle.load(handle)
+    return b
+
+def pickle_object(obj, filename):
+    with open(filename, 'wb') as output:
+        cPickle.dump(obj, output, -1)

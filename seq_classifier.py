@@ -52,7 +52,7 @@ class SSNE_param:
 
         self.elite_fraction = 0.1
         self.crossover_prob = 0.3
-        self.mutation_prob = 0.9
+        self.mutation_prob = 0.8
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -80,6 +80,7 @@ class Parameters:
             self.interleaving_upper_bound = 20
             self.is_memoried = 1
             self.repeat_trials = 10
+            self.test_trials = 50
 
             #DEAP/SSNE stuff
             self.use_ssne = 1
@@ -198,7 +199,7 @@ class Sequence_recall:
     def test_net(self, index): #Test is binary
         reward = 0.0
         test_boost = 5
-        for trial in range(self.parameters.repeat_trials * test_boost):
+        for trial in range(self.parameters.test_trials):
             input = self.generate_input() #get input
             net_output = []
             for inp in input: #Run network to get output
@@ -210,7 +211,7 @@ class Sequence_recall:
             if net_output[-1] * target > (1.0 - self.parameters.test_tolerance): reward += 1.0
             #reward += net_output[-1] * target
 
-        return reward/(self.parameters.repeat_trials * test_boost)
+        return reward/(self.parameters.test_trials)
 
 if __name__ == "__main__":
 

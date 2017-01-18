@@ -51,8 +51,8 @@ class SSNE_param:
         else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
-        self.crossover_prob = 0.3
-        self.mutation_prob = 0.7
+        self.crossover_prob = 0.25
+        self.mutation_prob = 0.9
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -79,12 +79,12 @@ class Parameters:
             self.interleaving_lower_bound = 5
             self.interleaving_upper_bound = 10
             self.is_memoried = 1
-            self.repeat_trials = 5
+            self.repeat_trials = 10
+            self.test_trials = 10
 
             #DEAP/SSNE stuff
             self.use_ssne = 1
-            self.use_deap = 0
-            if self.use_deap or self.use_ssne:
+            if self.use_ssne:
                 self.ssne_param = SSNE_param( self.is_memoried)
             self.total_gens = 10000
 
@@ -94,7 +94,8 @@ class Parameters:
             #3 Binary and Order matters
             #4 Binary and Order doesn't matter - evaluate remember performance
             #5 Test - final performance only matters
-            self.reward_scheme = 2
+            #6 Combine #2 and #3
+            self.reward_scheme = 6
 
             self.tolerance = 1
             self.test_tolerance = 1
@@ -164,6 +165,14 @@ class T_maze:
                     reward = 0
                     break
 
+        elif self.parameters.reward_scheme == 6: #Combine #2 and #5
+            for i, j in zip(target, output):
+                reward += (i * j)/2.0
+
+            for i, j in zip(target, output):
+                if i * j < 0: break
+                reward += 0.5
+
         return reward/self.depth
 
     def run_simulation(self, index):
@@ -202,7 +211,7 @@ class T_maze:
     def test_net(self, index): #Test is binary
         reward = 0.0
         test_boost = 5
-        for trial in range(self.parameters.repeat_trials * test_boost):
+        for trial in range(self.parameters.test_trials):
             trial_reward = 0.0
             input, target = self.generate_input()  # get input
             net_output = []
@@ -213,13 +222,14 @@ class T_maze:
             #Reward
 
             for i, j in zip(target, net_output):
+                print i,j
                 if i * j > 0: trial_reward = 1.0
                 else:
                     trial_reward = 0.0
                     break
             reward += trial_reward
 
-        return reward/(self.parameters.repeat_trials * test_boost)
+        return reward/(self.parameters.test_trials)
 
 if __name__ == "__main__":
 
