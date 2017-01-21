@@ -45,7 +45,7 @@ class Parameters:
             self.predator_random = 0
             self.prey_random = 1
             self.total_generations = 10000
-            self.angle_res = 45
+            self.angle_res = 90
             self.observing_prob = 1
 
             self.is_memoried_predator = 1

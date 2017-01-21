@@ -163,10 +163,9 @@ class Sequence_recall:
 
         return reward
 
-    def run_simulation(self, index):
+    def run_simulation(self, index, epoch_inputs):
         reward = 0.0
-        for trial in range(self.parameters.repeat_trials):
-            input = self.generate_input() #get input
+        for input in epoch_inputs:
             net_output = []
             for inp in input: #Run network to get output
                 inp=np.array([inp])
@@ -180,8 +179,14 @@ class Sequence_recall:
 
     def evolve(self):
         best_epoch_reward = -1000000
+
+        #Generate epoch input
+        epoch_inputs = []
+        for i in range(parameters.repeat_trials):
+            epoch_inputs.append(self.generate_input())
+
         for i in range(self.parameters.population_size): #Test all genomes/individuals
-            reward = self.run_simulation(i)
+            reward = self.run_simulation(i, epoch_inputs)
             if reward > best_epoch_reward: best_epoch_reward = reward
 
         #HOF test net
@@ -198,7 +203,6 @@ class Sequence_recall:
 
     def test_net(self, index): #Test is binary
         reward = 0.0
-        test_boost = 5
         for trial in range(self.parameters.test_trials):
             input = self.generate_input() #get input
             net_output = []

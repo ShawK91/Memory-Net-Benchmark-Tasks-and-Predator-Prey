@@ -16,7 +16,7 @@ from scipy.special import expit
 #import pickle
 #import neat as py_neat
 #from neat import nn
-import sys,os
+import sys,os, cPickle
 
 class normal_net:
     def __init__(self, num_input, num_hnodes, num_output, mean = 0, std = 1):
@@ -454,6 +454,13 @@ class SSNE:
                     gene2.w_12[ind_cr, :] = gene1.w_12[ind_cr, :]
                 else: continue
 
+    def regularize_weight(self, weight):
+        if weight > self.parameters.ssne_param.weight_magnitude_limit:
+            weight = self.parameters.ssne_param.weight_magnitude_limit
+        if weight < -self.parameters.ssne_param.weight_magnitude_limit:
+            weight = -self.parameters.ssne_param.weight_magnitude_limit
+        return weight
+
     def mutate_inplace(self, gene):
         mut_strength = 0.2
         num_mutation_frac = 0.2
@@ -473,6 +480,9 @@ class SSNE:
                 else: #Normal mutation
                     gene.w_inpgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_inpgate[ind_dim1, ind_dim2])
 
+                # Regularization hard limit
+                gene.w_inpgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_inpgate[ind_dim1, ind_dim2])
+
             # Layer 2
             num_mutations = randint(1, int(num_mutation_frac * gene.w_rec_inpgate.size))
             for i in range(num_mutations):
@@ -484,6 +494,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_rec_inpgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_rec_inpgate[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_rec_inpgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_rec_inpgate[ind_dim1, ind_dim2])
 
             # Layer 3
             num_mutations = randint(1, int(num_mutation_frac * gene.w_mem_inpgate.size))
@@ -497,6 +510,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_mem_inpgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_mem_inpgate[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_mem_inpgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_mem_inpgate[ind_dim1, ind_dim2])
 
 
 
@@ -514,6 +530,9 @@ class SSNE:
                     gene.w_inp[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_inp[
                         ind_dim1, ind_dim2])
 
+                # Regularization hard limit
+                gene.w_inp[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_inp[ind_dim1, ind_dim2])
+
             # Layer 2
             num_mutations = randint(1, int(num_mutation_frac * gene.w_rec_inp.size))
             for i in range(num_mutations):
@@ -526,6 +545,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_rec_inp[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_rec_inp[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_rec_inp[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_rec_inp[ind_dim1, ind_dim2])
 
 
             #FORGET GATES
@@ -542,6 +564,9 @@ class SSNE:
                     gene.w_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_forgetgate[
                         ind_dim1, ind_dim2])
 
+                # Regularization hard limit
+                gene.w_forgetgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_forgetgate[ind_dim1, ind_dim2])
+
             # Layer 2
             num_mutations = randint(1, int(num_mutation_frac * gene.w_rec_forgetgate.size))
             for i in range(num_mutations):
@@ -554,6 +579,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_rec_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_rec_forgetgate[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_rec_forgetgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_rec_forgetgate[ind_dim1, ind_dim2])
 
             # Layer 3
             num_mutations = randint(1, int(num_mutation_frac * gene.w_mem_forgetgate.size))
@@ -568,7 +596,10 @@ class SSNE:
                     gene.w_mem_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_mem_forgetgate[
                         ind_dim1, ind_dim2])
 
-            #OUTOUT WEIGHTS
+                # Regularization hard limit
+                gene.w_mem_forgetgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_mem_forgetgate[ind_dim1, ind_dim2])
+
+            #OUTPUT WEIGHTS
             num_mutations = randint(1, int(num_mutation_frac * gene.w_output.size))
             for i in range(num_mutations):
                 ind_dim1 = randint(0, gene.w_output.shape[0] - 1)
@@ -580,6 +611,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_output[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_output[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_output[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_output[ind_dim1, ind_dim2])
 
             # MEMORY CELL (PRIOR)
             num_mutations = randint(1, int(num_mutation_frac * gene.w_forgetgate.size))
@@ -593,6 +627,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_forgetgate[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_forgetgate[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_forgetgate[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_forgetgate[ind_dim1, ind_dim2])
 
 
 
@@ -611,6 +648,9 @@ class SSNE:
                     gene.w_01[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_01[
                         ind_dim1, ind_dim2])
 
+                # Regularization hard limit
+                gene.w_01[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_01[ind_dim1, ind_dim2])
+
             # Layer 2
             num_mutations = randint(1, int(num_mutation_frac * gene.w_12.size))
             for i in range(num_mutations):
@@ -623,6 +663,9 @@ class SSNE:
                 else:  # Normal mutation
                     gene.w_12[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * gene.w_12[
                         ind_dim1, ind_dim2])
+
+                # Regularization hard limit
+                gene.w_12[ind_dim1, ind_dim2] = self.regularize_weight(gene.w_12[ind_dim1, ind_dim2])
 
     def epoch(self):
         self.current_gen += 1

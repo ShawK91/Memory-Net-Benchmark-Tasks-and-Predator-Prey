@@ -53,6 +53,7 @@ class SSNE_param:
         self.elite_fraction = 0.1
         self.crossover_prob = 0.25
         self.mutation_prob = 0.9
+        self.weight_magnitude_limit = 10
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -75,12 +76,12 @@ class SSNE_param:
 class Parameters:
     def __init__(self):
             self.population_size = 100
-            self.depth = 2
-            self.interleaving_lower_bound = 5
-            self.interleaving_upper_bound = 10
+            self.depth = 3
+            self.interleaving_lower_bound = 10
+            self.interleaving_upper_bound = 20
             self.is_memoried = 1
             self.repeat_trials = 10
-            self.test_trials = 10
+            self.test_trials = 50
 
             #DEAP/SSNE stuff
             self.use_ssne = 1
@@ -175,10 +176,9 @@ class T_maze:
 
         return reward/self.depth
 
-    def run_simulation(self, index):
+    def run_simulation(self, index, epoch_inputs, epoch_targets):
         reward = 0.0
-        for trial in range(self.parameters.repeat_trials):
-            input, target = self.generate_input() #get input
+        for input, target in zip(epoch_inputs, epoch_targets):
             net_output = []
             for inp in input: #Run network to get output
                 net_out = (self.agent.pop[index].feedforward(inp)[0][0] - 0.5) * 2
@@ -192,8 +192,16 @@ class T_maze:
 
     def evolve(self, gen):
         best_epoch_reward = -1000000
+
+        #Generate epoch input
+        epoch_inputs = []; epoch_targets = []
+        for i in range(parameters.repeat_trials):
+            input, target = self.generate_input()
+            epoch_inputs.append(input)
+            epoch_targets.append(target)
+
         for i in range(self.parameters.population_size): #Test all genomes/individuals
-            reward = self.run_simulation(i)
+            reward = self.run_simulation(i, epoch_inputs, epoch_targets)
             if reward > best_epoch_reward: best_epoch_reward = reward
 
         #HOF test net
@@ -201,7 +209,7 @@ class T_maze:
         hof_score = self.test_net(hof_index)
 
         #Save population and HOF
-        if (gen + 1) % 1000 == 0:
+        if (gen + 1) % 1 == 0:
             mod.pickle_object(self.agent.pop, save_foldername + '/seq_recall_pop_' + str(gen))
             mod.pickle_object(self.agent.pop[hof_index], save_foldername + '/seq_recall_hof_' + str(gen))
 
@@ -222,7 +230,7 @@ class T_maze:
             #Reward
 
             for i, j in zip(target, net_output):
-                print i,j
+                #print i,j
                 if i * j > 0: trial_reward = 1.0
                 else:
                     trial_reward = 0.0
