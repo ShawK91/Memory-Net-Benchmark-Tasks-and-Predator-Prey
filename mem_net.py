@@ -13,8 +13,9 @@ class Deap_param:
         else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
-        self.crossover_prob = 0.2
-        self.mutation_prob = 0.5
+        self.crossover_prob = 0.1
+        self.mutation_prob = 0.9
+        self.weight_magnitude_limit = 1000000000
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -37,23 +38,24 @@ class Deap_param:
 class Parameters:
     def __init__(self):
             self.population_size = 100
-            self.grid_row = 15
-            self.grid_col = 15
-            self.total_steps = 15 # Total roaming steps without goal before termination
-            self.num_predator = 2
-            self.num_prey= 1
+            self.grid_row = 20
+            self.grid_col = 20
+            self.total_steps = 25 # Total roaming steps without goal before termination
+            self.num_predator = 6
+            self.num_prey = 9
             self.predator_random = 0
             self.prey_random = 1
-            self.total_generations = 10000
-            self.angle_res = 90
+            self.total_generations = 20000
+            self.angle_res = 45
             self.observing_prob = 1
+            self.coupling = 2  # Number of predators required to simultaneously observe a prey
 
             self.is_memoried_predator = 1
             self.is_memoried_prey = 0
 
-            self.prey_speed_boost = 5
+            self.prey_speed_boost = 1
             self.periodic_poi_mode = 1
-            self.period = 3
+            self.period = 1
 
             #Tertiary Variables (Closed for cleanliness) Open to modify
             if True:
@@ -65,7 +67,7 @@ class Parameters:
                     self.deap_param_predator = Deap_param(self.angle_res, self.is_memoried_predator)
                     self.deap_param_prey = Deap_param(self.angle_res, self.is_memoried_prey)
 
-                self.D_reward = 1  # D reward scheme
+                self.D_reward = 0  # D reward scheme
                 self.prey_global = 0 #Prey's reward scheme
                 self.wheel_action = 0
 
@@ -297,9 +299,11 @@ def evolve(gridworld, parameters, generation, best_hof_score):
 
 
     epoch_metrics = np.array(epoch_metrics)
-    avg_epoch = np.mean(epoch_metrics)
-    sd_epoch = np.std(epoch_metrics)
-    return avg_epoch, sd_epoch, hof_reward
+    #avg_epoch = np.mean(epoch_metrics)
+    #sd_epoch = np.std(epoch_metrics)
+    max_epoch = max(epoch_metrics)
+
+    return max_epoch, hof_reward
 
 def run_simulation(parameters, gridworld, teams, is_test = False, is_hof = False): #Run simulation given a team and return fitness for each individuals in that team
 
@@ -368,17 +372,17 @@ if __name__ == "__main__":
     best_hof_score = 0
 
     for gen in range (parameters.total_generations): #Main Loop
-        curtime = time.time()
-        avg_epoch, sd_epoch, hof_reward = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
-        tracker.add_fitness(avg_epoch, gen) #Add average global performance to tracker
+        #curtime = time.time()
+        max_epoch, hof_reward = evolve(gridworld, parameters, gen, best_hof_score) #CCEA
+        tracker.add_fitness(max_epoch, gen) #Add average global performance to tracker
         tracker.add_hof_fitness(hof_reward, gen)  # Add hof global performance to tracker
-        elapsed = time.time() - curtime
+        #elapsed = time.time() - curtime
 
-        print elapsed
+        #print elapsed
 
 
-        #print 'Gen:', gen,'Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
-            #, ' HOF Reward:', int(hof_reward),' Cumul_hof_avg:',int(tracker.hof_avg_fitness), '  Avg epoch:',int(avg_epoch), ' Sd_epoch:',int(sd_epoch),  '  Cumul_Avg:',int(tracker.avg_fitness)
+        print 'Gen:', gen,'Memoried  ' if parameters.is_memoried_predator else 'Normal ', 'Memoried  ' if parameters.is_memoried_prey else 'Normal  '\
+            , ' HOF Reward:', int(hof_reward),' Cumul_hof_avg:',int(tracker.hof_avg_fitness), '  Avg epoch:',int(max_epoch), 'Cumul_Avg:',int(tracker.avg_fitness)
 
 
 

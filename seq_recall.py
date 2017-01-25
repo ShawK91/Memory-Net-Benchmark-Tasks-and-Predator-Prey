@@ -3,7 +3,7 @@ import numpy as np, os
 import mod_mem_net as mod, sys
 from random import randint
 import random
-
+print 'Running SEQUENCE RECALL'
 save_foldername = 'RSeq_Recall'
 class tracker(): #Tracker
     def __init__(self, parameters, foldername = save_foldername):
@@ -45,15 +45,15 @@ class tracker(): #Tracker
 class SSNE_param:
     def __init__(self, is_memoried):
         self.num_input = 2
-        self.num_hnodes = 5
+        self.num_hnodes = 20
         self.num_output = 1
         if is_memoried: self.type_id = 'memoried'
         else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
-        self.crossover_prob = 0.25
+        self.crossover_prob = 0.1
         self.mutation_prob = 0.9
-        self.weight_magnitude_limit = 10
+        self.weight_magnitude_limit = 1000000000000
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -76,7 +76,7 @@ class SSNE_param:
 class Parameters:
     def __init__(self):
             self.population_size = 100
-            self.depth = 3
+            self.depth = 5
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
             self.is_memoried = 1
@@ -100,8 +100,6 @@ class Parameters:
 
             self.tolerance = 1
             self.test_tolerance = 1
-
-
 parameters = Parameters() #Create the Parameters class
 tracker = tracker(parameters) #Initiate tracker
 
@@ -210,8 +208,9 @@ class T_maze:
 
         #Save population and HOF
         if (gen + 1) % 1 == 0:
-            mod.pickle_object(self.agent.pop, save_foldername + '/seq_recall_pop_' + str(gen))
-            mod.pickle_object(self.agent.pop[hof_index], save_foldername + '/seq_recall_hof_' + str(gen))
+            mod.pickle_object(self.agent.pop, save_foldername + '/seq_recall_pop')
+            mod.pickle_object(self.agent.pop[hof_index], save_foldername + '/seq_recall_hof')
+            np.savetxt(save_foldername + '/gen_tag', np.array([gen + 1]), fmt='%.3f', delimiter=',')
 
         self.agent.epoch()
         return best_epoch_reward, hof_score

@@ -4,6 +4,7 @@ import mod_mem_net as mod, sys
 from random import randint
 import random
 
+print 'Running SEQUENCE CLASSIFIER'
 save_foldername = 'RSeq_classifier'
 class tracker(): #Tracker
     def __init__(self, parameters, foldername = save_foldername):
@@ -45,14 +46,15 @@ class tracker(): #Tracker
 class SSNE_param:
     def __init__(self, is_memoried):
         self.num_input = 1
-        self.num_hnodes = 5
+        self.num_hnodes = 20
         self.num_output = 1
         if is_memoried: self.type_id = 'memoried'
         else: self.type_id = 'normal'
 
         self.elite_fraction = 0.1
-        self.crossover_prob = 0.3
-        self.mutation_prob = 0.8
+        self.crossover_prob = 0.1
+        self.mutation_prob = 0.9
+        self.weight_magnitude_limit = 1000000000000
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -75,7 +77,7 @@ class SSNE_param:
 class Parameters:
     def __init__(self):
             self.population_size = 100
-            self.depth = 5
+            self.depth = 7
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
             self.is_memoried = 1
@@ -87,18 +89,18 @@ class Parameters:
             self.use_deap = 0
             if self.use_deap or self.use_ssne:
                 self.ssne_param = SSNE_param( self.is_memoried)
-            self.total_gens = 15000
+            self.total_gens = 25000
 
             #Reward scheme
             #1 Block continous reward - End decision matters
             #2 Block reward binary - End decision matters plus also calculated binary rather than continously
             #3 Fine continous reward - prediction at each time-step matters
             #4 Coarse reward clacluated only at points of 1/-1 introdcution
-            self.reward_scheme = 3
+            #5 Combine #3 and #2 (test)
+            self.reward_scheme = 5
 
             self.tolerance = 1
             self.test_tolerance = 1
-
 
 parameters = Parameters() #Create the Parameters class
 tracker = tracker(parameters) #Initiate tracker
@@ -161,6 +163,17 @@ class Sequence_recall:
                     elif point_reward < -1: point_reward = -1
                     reward += point_reward
 
+        elif self.parameters.reward_scheme == 5: #Combine #3 and test (#2)
+            reward = 0.0
+            target = 0.0
+            for i, j in zip(input, output):
+                target += i
+                point_reward = j * target
+                if point_reward > 1: point_reward = 1
+                elif point_reward < -1: point_reward = -1
+                reward += point_reward
+            if j * target > 0: reward += parameters.depth / 2.0
+
         return reward
 
     def run_simulation(self, index, epoch_inputs):
@@ -195,8 +208,9 @@ class Sequence_recall:
 
         #Save population and HOF
         if (gen + 1) % 1000 == 0:
-            mod.pickle_object(self.agent.pop, save_foldername + '/seq_classification_pop_' + str(gen))
-            mod.pickle_object(self.agent.pop[hof_index], save_foldername + '/seq_classification_hof_' + str(gen))
+            mod.pickle_object(self.agent.pop, save_foldername + '/seq_classification_pop')
+            mod.pickle_object(self.agent.pop[hof_index], save_foldername + '/seq_classification_hof')
+            np.savetxt(save_foldername + '/gen_tag', np.array([gen + 1]), fmt='%.3f', delimiter=',')
 
         self.agent.epoch()
         return best_epoch_reward, hof_score

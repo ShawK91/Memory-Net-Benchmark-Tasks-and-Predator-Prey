@@ -455,10 +455,10 @@ class SSNE:
                 else: continue
 
     def regularize_weight(self, weight):
-        if weight > self.parameters.ssne_param.weight_magnitude_limit:
-            weight = self.parameters.ssne_param.weight_magnitude_limit
-        if weight < -self.parameters.ssne_param.weight_magnitude_limit:
-            weight = -self.parameters.ssne_param.weight_magnitude_limit
+        if weight > self.ssne_param.weight_magnitude_limit:
+            weight = self.ssne_param.weight_magnitude_limit
+        if weight < -self.ssne_param.weight_magnitude_limit:
+            weight = -self.ssne_param.weight_magnitude_limit
         return weight
 
     def mutate_inplace(self, gene):
@@ -1819,7 +1819,10 @@ class Gridworld:
                 for soft_index, ag_id in enumerate(soft_stat):
                     prey.observation_log.append(ag_id)
                     if dist_soft_stat[soft_index] < prey.min_approach_log[ag_id]: #Update minimum approach distance
-                        prey.min_approach_log[ag_id] = dist_soft_stat[soft_index]
+                        #prey.min_approach_log[ag_id] = dist_soft_stat[soft_index]
+                        prey.min_approach_log[ag_id] = min(soft_stat)
+
+
                 prey.is_caught = True
 
     def save_pop(self):
