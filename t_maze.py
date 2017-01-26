@@ -2,12 +2,11 @@ import numpy as np, os, math
 #import MultiNEAT as NEAT
 import mod_mem_net as mod, sys
 from random import randint, shuffle
-import random
 
 print 'Running T-MAZE'
 
-#TODO RESET SSNE MEMORY  AND OUTPUT FOR REPEAT TRIALS!!!!!!!!!!
 #TODO EVOLUTION META IN SSNE
+
 save_foldername = 'Res_T-maze'
 class tracker(): #Tracker
     def __init__(self, parameters, foldername = save_foldername):
@@ -142,7 +141,6 @@ class T_maze:
         self.agent_pos = self.start[:]
         self.state = np.zeros(6)
 
-
     def is_collided(self, x, y):
         if x < 0 or y < 0 or x > 25 or y > 35: return False #Main boundary
 
@@ -252,6 +250,7 @@ class T_maze:
             self.high_reward_local = self.reward_local_dist[local_inits]
 
             for trial in range(self.parameters.num_trials):
+                self.agent.pop[index].reset_bank()
                 #Switch high reward location midway
                 if trial == int(self.parameters.num_trials/2):
                     while True:
@@ -319,28 +318,6 @@ class T_maze:
         self.agent.epoch()
         return best_epoch_reward, best_epoch_optimality, hof_reward, hof_optimality
 
-    def test_net(self, index): #Test is binary
-        reward = 0.0
-        test_boost = 5
-        for trial in range(self.parameters.test_trials):
-            trial_reward = 0.0
-            input, target = self.generate_input()  # get input
-            net_output = []
-            for inp in input:  # Run network to get output
-                net_out = (self.agent.pop[index].feedforward(inp)[0][0] - 0.5) *2
-                if inp[1] == 0: net_output.append(net_out)
-
-            #Reward
-
-            for i, j in zip(target, net_output):
-                #print i,j
-                if i * j > 0: trial_reward = 1.0
-                else:
-                    trial_reward = 0.0
-                    break
-            reward += trial_reward
-
-        return reward/(self.parameters.test_trials)
 
 if __name__ == "__main__":
 
@@ -352,7 +329,7 @@ if __name__ == "__main__":
         tracker.add_best_optimality(best_epoch_optimality, gen)  # Add best epoch optimality
         tracker.add_hof_reward(best_epoch_reward, gen)  # Add HOF epoch reward
         tracker.add_hof_optimality(best_epoch_optimality, gen)  # Add HOF epoch optimality
-        print 'Gen:', gen, ' Epoch_rew:', best_epoch_reward, ' Epoch_opt:', best_epoch_optimality, ' HOF_Rew:', hof_reward, ' HOF_opt:', hof_optimality#,  'Cml_rew:', tracker.hof_avg_fitness, 'Cml_opt:'
+        print 'Gen:', gen, ' Epoch_rew:', "%0.3f" % best_epoch_reward, ' Epoch_opt:', "%0.2f" % best_epoch_optimality, ' HOF_Rew:', "%0.2f" % hof_reward, ' HOF_opt:', "%0.2f" % hof_optimality #,  'Cml_rew:', "%0.3f" % tracker.avg_best_rew, 'Cml_opt:'
 
 
 

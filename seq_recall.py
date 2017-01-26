@@ -3,6 +3,8 @@ import numpy as np, os
 import mod_mem_net as mod, sys
 from random import randint
 import random
+
+
 print 'Running SEQUENCE RECALL'
 save_foldername = 'RSeq_Recall'
 class tracker(): #Tracker
@@ -76,7 +78,7 @@ class SSNE_param:
 class Parameters:
     def __init__(self):
             self.population_size = 100
-            self.depth = 5
+            self.depth = 3
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
             self.is_memoried = 1
@@ -177,6 +179,7 @@ class T_maze:
     def run_simulation(self, index, epoch_inputs, epoch_targets):
         reward = 0.0
         for input, target in zip(epoch_inputs, epoch_targets):
+            self.agent.pop[index].reset_bank()
             net_output = []
             for inp in input: #Run network to get output
                 net_out = (self.agent.pop[index].feedforward(inp)[0][0] - 0.5) * 2
@@ -219,6 +222,7 @@ class T_maze:
         reward = 0.0
         test_boost = 5
         for trial in range(self.parameters.test_trials):
+            self.agent.pop[index].reset_bank()
             trial_reward = 0.0
             input, target = self.generate_input()  # get input
             net_output = []
@@ -243,7 +247,7 @@ if __name__ == "__main__":
     task = T_maze(parameters)
     for gen in range(parameters.total_gens):
         epoch_reward, hof_score = task.evolve(gen)
-        print 'Generation:', gen, ' Epoch_reward:', epoch_reward, '  Score:', hof_score, '  Cumul_Score:', tracker.hof_avg_fitness
+        print 'Generation:', gen, ' Epoch_reward:', "%0.2f" % epoch_reward, '  Score:', "%0.2f" % hof_score, '  Cumul_Score:', "%0.2f" % tracker.hof_avg_fitness
         tracker.add_fitness(epoch_reward, gen)  # Add average global performance to tracker
         tracker.add_hof_fitness(hof_score, gen)  # Add average global performance to tracker
 

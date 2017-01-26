@@ -97,7 +97,7 @@ class Parameters:
             #3 Fine continous reward - prediction at each time-step matters
             #4 Coarse reward clacluated only at points of 1/-1 introdcution
             #5 Combine #3 and #2 (test)
-            self.reward_scheme = 5
+            self.reward_scheme = 3
 
             self.tolerance = 1
             self.test_tolerance = 1
@@ -105,7 +105,7 @@ class Parameters:
 parameters = Parameters() #Create the Parameters class
 tracker = tracker(parameters) #Initiate tracker
 
-class Sequence_recall:
+class Sequence_classifier:
     def __init__(self, parameters):
         self.parameters = parameters; self.ssne_param = self.parameters.ssne_param
         self.depth = self.parameters.depth
@@ -179,6 +179,7 @@ class Sequence_recall:
     def run_simulation(self, index, epoch_inputs):
         reward = 0.0
         for input in epoch_inputs:
+            self.agent.pop[index].reset_bank()
             net_output = []
             for inp in input: #Run network to get output
                 inp=np.array([inp])
@@ -218,6 +219,7 @@ class Sequence_recall:
     def test_net(self, index): #Test is binary
         reward = 0.0
         for trial in range(self.parameters.test_trials):
+            self.agent.pop[index].reset_bank()
             input = self.generate_input() #get input
             net_output = []
             for inp in input: #Run network to get output
@@ -233,10 +235,10 @@ class Sequence_recall:
 
 if __name__ == "__main__":
 
-    task = Sequence_recall(parameters)
+    task = Sequence_classifier(parameters)
     for gen in range(parameters.total_gens):
         epoch_reward, hof_score = task.evolve()
-        print 'Generation:', gen, ' Epoch_reward:', epoch_reward, '  Score:', hof_score, '  Cumul_Score:', tracker.hof_avg_fitness
+        print 'Generation:', gen+1, ' Epoch_reward:', "%0.2f" % epoch_reward, '  Score:', "%0.2f" % hof_score, '  Cumul_Score:', "%0.2f" % tracker.hof_avg_fitness
         tracker.add_fitness(epoch_reward, gen)  # Add average global performance to tracker
         tracker.add_hof_fitness(hof_score, gen)  # Add best global performance to tracker
 
