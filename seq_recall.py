@@ -56,6 +56,7 @@ class SSNE_param:
         self.crossover_prob = 0.1
         self.mutation_prob = 0.9
         self.weight_magnitude_limit = 1000000000000
+        self.mut_distribution = 3  # 1-Gaussian, 2-Laplace, 3-Uniform, ELSE-all 1s
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (

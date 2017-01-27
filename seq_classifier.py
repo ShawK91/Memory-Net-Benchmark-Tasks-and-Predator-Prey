@@ -3,7 +3,7 @@ import numpy as np, os
 import mod_mem_net as mod, sys
 from random import randint
 import random
-
+#np.seterr(all='raise')
 print 'Running SEQUENCE CLASSIFIER'
 save_foldername = 'RSeq_classifier'
 class tracker(): #Tracker
@@ -46,7 +46,7 @@ class tracker(): #Tracker
 class SSNE_param:
     def __init__(self, is_memoried):
         self.num_input = 1
-        self.num_hnodes = 20
+        self.num_hnodes = 1
         self.num_output = 1
         if is_memoried: self.type_id = 'memoried'
         else: self.type_id = 'normal'
@@ -55,6 +55,8 @@ class SSNE_param:
         self.crossover_prob = 0.1
         self.mutation_prob = 0.9
         self.weight_magnitude_limit = 1000000000000
+        self.mut_distribution = 3 #1-Gaussian, 2-Laplace, 3-Uniform, ELSE-all 1s
+
         if is_memoried:
             self.total_num_weights = 3 * (
                 self.num_hnodes * (self.num_input + 1) + self.num_hnodes * (self.num_output + 1)) + 2 * self.num_hnodes * (
@@ -77,7 +79,7 @@ class SSNE_param:
 class Parameters:
     def __init__(self):
             self.population_size = 100
-            self.depth = 7
+            self.depth = 3
             self.interleaving_lower_bound = 10
             self.interleaving_upper_bound = 20
             self.is_memoried = 1
@@ -97,7 +99,7 @@ class Parameters:
             #3 Fine continous reward - prediction at each time-step matters
             #4 Coarse reward clacluated only at points of 1/-1 introdcution
             #5 Combine #3 and #2 (test)
-            self.reward_scheme = 3
+            self.reward_scheme = 5
 
             self.tolerance = 1
             self.test_tolerance = 1
@@ -220,6 +222,8 @@ class Sequence_classifier:
         reward = 0.0
         for trial in range(self.parameters.test_trials):
             self.agent.pop[index].reset_bank()
+            if trial == self.parameters.test_trials - 1: print self.agent.pop[index].memory_cell.transpose(),
+
             input = self.generate_input() #get input
             net_output = []
             for inp in input: #Run network to get output
@@ -229,8 +233,10 @@ class Sequence_classifier:
             if target > 1: target = 1
             elif target < -1: target = -1
             if net_output[-1] * target > (1.0 - self.parameters.test_tolerance): reward += 1.0
-            #reward += net_output[-1] * target
+            if trial == self.parameters.test_trials-1: print target, net_output[-1]
 
+        print self.agent.pop[index].memory_cell.transpose()
+        print
         return reward/(self.parameters.test_trials)
 
 if __name__ == "__main__":
